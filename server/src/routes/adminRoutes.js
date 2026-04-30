@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { adminLogin } from '../controllers/adminAuthController.js';
 import { adminCreateProduct, adminListProducts, adminUpdateProductStatus } from '../controllers/adminProductController.js';
 import { adminListOrders, adminUpdateOrderStatus } from '../controllers/adminOrderController.js';
+import { adminCreateTask, adminListTasks, adminUpdateTaskStatus } from '../controllers/adminTaskController.js';
 import { getDashboardStats } from '../controllers/dashboardController.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
@@ -25,5 +26,9 @@ router.patch('/products/:id/status', adminUpdateProductStatus);
 
 router.get('/orders', adminListOrders);
 router.patch('/orders/:id/status', adminUpdateOrderStatus);
+
+router.get('/tasks', adminListTasks);
+router.post('/tasks', adminCreateTask);
+router.patch('/tasks/:id/status', adminUpdateTaskStatus);
 
 export default router;
