@@ -3,6 +3,11 @@ import { isPositiveInteger, isPositiveMoney, sanitizeString } from '../utils/val
 import { rewardUserPoints } from '../services/accountService.js';
 import { writeAdminLog } from '../services/adminLogService.js';
 
+function normalizeAmountCategory(value) {
+  const category = sanitizeString(value || 'micro', 32);
+  return ['micro', 'small', 'medium', 'high', 'custom'].includes(category) ? category : 'micro';
+}
+
 async function refundTaskDeposit(connection, accept, adminId, reason) {
   if (accept.deposit_status !== 'frozen') return;
 
@@ -88,6 +93,7 @@ async function rewardTaskUser(connection, accept, task) {
 export async function adminListTasks(req, res, next) {
   try {
     const status = sanitizeString(req.query.status || '', 32);
+    const amountCategory = sanitizeString(req.query.amountCategory || req.query.amount_category || '', 32);
     const params = {};
     let where = 'WHERE 1=1';
 
@@ -96,8 +102,13 @@ export async function adminListTasks(req, res, next) {
       params.status = status;
     }
 
+    if (amountCategory) {
+      where += ' AND amount_category = :amountCategory';
+      params.amountCategory = amountCategory;
+    }
+
     const rows = await query(
-      `SELECT id, title, reward_amount, reward_points, deadline, max_accept_count, current_accept_count,
+      `SELECT id, title, amount_category, reward_amount, reward_points, deadline, max_accept_count, current_accept_count,
               vip_only, deposit_required, deposit_type, deposit_amount, status, created_at
        FROM tasks
        ${where}
@@ -116,6 +127,7 @@ export async function adminCreateTask(req, res, next) {
   try {
     const title = sanitizeString(req.body.title || '', 128);
     const content = sanitizeString(req.body.content || '', 2000);
+    const amountCategory = normalizeAmountCategory(req.body.amountCategory || req.body.amount_category);
     const rewardAmount = Number(req.body.rewardAmount || 0);
     const rewardPoints = Number(req.body.rewardPoints || 0);
     const maxAcceptCount = Number(req.body.maxAcceptCount || 1);
@@ -133,11 +145,11 @@ export async function adminCreateTask(req, res, next) {
     if (!isPositiveMoney(depositAmount)) return res.status(400).json({ success: false, message: '押金金额不合法' });
 
     const result = await query(
-      `INSERT INTO tasks (admin_id, title, content, reward_amount, reward_points, deadline, max_accept_count,
+      `INSERT INTO tasks (admin_id, title, content, amount_category, reward_amount, reward_points, deadline, max_accept_count,
                           vip_only, deposit_required, deposit_type, deposit_amount, status)
-       VALUES (:adminId, :title, :content, :rewardAmount, :rewardPoints, :deadline, :maxAcceptCount,
+       VALUES (:adminId, :title, :content, :amountCategory, :rewardAmount, :rewardPoints, :deadline, :maxAcceptCount,
                :vipOnly, :depositRequired, :depositType, :depositAmount, :status)`,
-      { adminId: req.user.id, title, content, rewardAmount, rewardPoints, deadline, maxAcceptCount, vipOnly, depositRequired, depositType, depositAmount, status }
+      { adminId: req.user.id, title, content, amountCategory, rewardAmount, rewardPoints, deadline, maxAcceptCount, vipOnly, depositRequired, depositType, depositAmount, status }
     );
 
     return res.status(201).json({ success: true, message: '任务已创建', data: { id: result.insertId } });
@@ -183,7 +195,7 @@ export async function adminListTaskSubmissions(req, res, next) {
     const rows = await query(
       `SELECT tp.id, tp.task_accept_id, tp.task_id, tp.user_id, tp.progress_percent, tp.content,
               tp.images, tp.files, tp.status, tp.review_comment, tp.created_at, tp.updated_at,
-              t.title, t.reward_amount, t.reward_points,
+              t.title, t.amount_category, t.reward_amount, t.reward_points,
               ta.deposit_type, ta.deposit_amount, ta.deposit_status,
               u.username, u.nickname, u.user_code
        FROM task_progress tp
