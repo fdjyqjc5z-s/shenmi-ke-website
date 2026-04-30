@@ -43,10 +43,41 @@
 
       <h2 class="section-title">邀请好友</h2>
       <div class="glass-card">
+        <div class="invite-summary">
+          <div>
+            <div class="stat-label">邀请总数</div>
+            <div class="stat-value">{{ inviteInfo.invite_count || 0 }}</div>
+          </div>
+          <div>
+            <div class="stat-label">已生效</div>
+            <div class="stat-value">{{ inviteInfo.effective_invite_count || 0 }}</div>
+          </div>
+          <div>
+            <div class="stat-label">邀请奖励</div>
+            <div class="stat-value">{{ inviteInfo.total_invite_points || 0 }}</div>
+          </div>
+        </div>
+
         <p class="muted">邀请链接</p>
         <div class="invite-box">{{ inviteFullUrl }}</div>
-        <p class="muted">已邀请：{{ inviteInfo.invite_count || 0 }} 人</p>
+        <p class="muted reward-rule">
+          新人注册奖励 {{ inviteInfo.reward_rules?.newcomer_points || 50 }} 积分；邀请好友注册奖励 {{ inviteInfo.reward_rules?.inviter_points || 20 }} 积分。
+        </p>
         <button class="action-btn" style="width:100%; margin-top:10px;" @click="copyInviteUrl">复制邀请链接</button>
+      </div>
+
+      <h2 class="section-title">邀请明细</h2>
+      <div v-if="inviteInfo.relations.length === 0" class="glass-card muted">暂无邀请记录，复制邀请链接发给好友即可。</div>
+      <div v-else class="list-card" v-for="item in inviteInfo.relations" :key="item.id">
+        <div style="flex:1; min-width:0;">
+          <div class="badge-row">
+            <span class="badge">{{ inviteStatusText(item.status) }}</span>
+            <span class="badge">{{ item.effective_type || 'register' }}</span>
+          </div>
+          <h3>{{ item.nickname || item.username || '神秘客用户' }}</h3>
+          <p class="muted">用户编码：{{ item.user_code || '--' }}</p>
+          <p class="muted">注册时间：{{ formatTime(item.created_at) }} | 生效时间：{{ formatTime(item.effective_at) }}</p>
+        </div>
       </div>
 
       <h2 class="section-title">申请提现</h2>
@@ -65,6 +96,7 @@
       </div>
 
       <h2 class="section-title">提现记录</h2>
+      <div v-if="withdrawOrders.length === 0" class="glass-card muted">暂无提现记录</div>
       <div class="list-card" v-for="item in withdrawOrders" :key="item.withdraw_no">
         <div style="flex:1;">
           <div class="badge">{{ withdrawStatusText(item.status) }}</div>
@@ -117,6 +149,14 @@ const inviteInfo = reactive({
   invite_code: '',
   invite_url: '',
   invite_count: 0,
+  effective_invite_count: 0,
+  pending_invite_count: 0,
+  total_invite_points: 0,
+  reward_rules: {
+    newcomer_points: 50,
+    inviter_points: 20,
+    effective_condition: '好友通过你的邀请链接注册后立即生效'
+  },
   relations: []
 });
 
@@ -136,6 +176,11 @@ const inviteFullUrl = computed(() => {
 
 function withdrawStatusText(status) {
   const map = { pending: '待审核', approved: '已通过', rejected: '已拒绝', paid: '已打款' };
+  return map[status] || status;
+}
+
+function inviteStatusText(status) {
+  const map = { pending: '待生效', effective: '已生效', invalid: '无效' };
   return map[status] || status;
 }
 
@@ -209,6 +254,22 @@ onMounted(loadMine);
 </script>
 
 <style scoped>
+.badge-row,
+.invite-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.invite-summary {
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
 .invite-box {
   padding: 12px;
   border-radius: 14px;
@@ -216,6 +277,11 @@ onMounted(loadMine);
   border: 1px solid rgba(255,255,255,0.08);
   word-break: break-all;
   color: #e6ddff;
+}
+
+.reward-rule {
+  margin-bottom: 0;
+  font-size: 13px;
 }
 
 .error-text {
