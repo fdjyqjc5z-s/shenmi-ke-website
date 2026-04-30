@@ -2,6 +2,19 @@ import { dbPool, query, transaction } from '../config/db.js';
 import { createOrderNo } from '../utils/id.js';
 import { checkProductAccess } from '../services/productAccessService.js';
 
+function emptyAccessDetails(item) {
+  return {
+    vip_required: Boolean(item?.vip_only),
+    vip_active: false,
+    points_required: Number(item?.required_points || 0),
+    points_balance: 0,
+    points_missing: Number(item?.required_points || 0),
+    invites_required: Number(item?.required_invites || 0),
+    invite_count: 0,
+    invites_missing: Number(item?.required_invites || 0)
+  };
+}
+
 async function attachProductAccess(products, user) {
   const list = Array.isArray(products) ? products : [products];
 
@@ -10,7 +23,8 @@ async function attachProductAccess(products, user) {
       ...item,
       can_purchase: false,
       access_message: '登录后可购买或兑换',
-      access_required: 'login'
+      access_required: 'login',
+      access_details: emptyAccessDetails(item)
     }));
   }
 
@@ -21,7 +35,8 @@ async function attachProductAccess(products, user) {
       ...item,
       can_purchase: access.allowed,
       access_message: access.message,
-      access_required: access.allowed ? 'none' : 'condition'
+      access_required: access.allowed ? 'none' : 'condition',
+      access_details: access.details || emptyAccessDetails(item)
     });
   }
 
