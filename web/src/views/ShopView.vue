@@ -39,6 +39,12 @@
           <p class="muted">{{ priceText(item) }}</p>
           <p class="muted">库存：{{ item.stock }} | 销量：{{ item.sales_count || 0 }} | 奖励积分：{{ item.reward_points }}</p>
           <p v-if="item.required_points || item.required_invites" class="muted">门槛：{{ item.required_points }} 积分 / {{ item.required_invites }} 邀请</p>
+          <div class="unlock-mini">
+            <div v-for="row in unlockRows(item)" :key="row.label" class="unlock-row">
+              <span>{{ row.label }}</span>
+              <strong :class="{ ok: row.ok }">{{ row.text }}</strong>
+            </div>
+          </div>
           <p class="access-tip" :class="{ allowed: item.can_purchase }">{{ item.access_message || '登录后可查看购买资格' }}</p>
         </div>
 
@@ -72,6 +78,12 @@
         </p>
         <div class="access-panel" :class="{ allowed: activeProduct?.can_purchase }">
           {{ activeProduct?.access_message || '登录后可查看购买资格' }}
+        </div>
+        <div class="unlock-panel">
+          <div v-for="row in unlockRows(activeProduct)" :key="row.label" class="unlock-row detail-row">
+            <span>{{ row.label }}</span>
+            <strong :class="{ ok: row.ok }">{{ row.text }}</strong>
+          </div>
         </div>
         <div class="modal-actions">
           <button class="action-btn" :class="{ 'ghost-btn': !canClickBuy(activeProduct) }" @click="handleBuyClick(activeProduct)">
@@ -140,6 +152,42 @@ function priceText(item) {
     return `积分兑换：${item.points_price} 积分 | 现金价：${item.price} 元`;
   }
   return `价格：${item.price} 元 | 积分价：${item.points_price}`;
+}
+
+function unlockRows(item) {
+  if (!item) return [];
+  const details = item.access_details || {};
+  const rows = [];
+
+  if (item.vip_only || details.vip_required) {
+    rows.push({
+      label: 'VIP资格',
+      ok: Boolean(details.vip_active),
+      text: details.vip_active ? '已开通' : '未开通'
+    });
+  }
+
+  if (Number(item.required_points || details.points_required || 0) > 0) {
+    rows.push({
+      label: '积分门槛',
+      ok: Number(details.points_missing || 0) <= 0,
+      text: `${details.points_balance || 0}/${details.points_required || item.required_points || 0}，还差 ${details.points_missing || 0}`
+    });
+  }
+
+  if (Number(item.required_invites || details.invites_required || 0) > 0) {
+    rows.push({
+      label: '邀请门槛',
+      ok: Number(details.invites_missing || 0) <= 0,
+      text: `${details.invite_count || 0}/${details.invites_required || item.required_invites || 0}，还差 ${details.invites_missing || 0}`
+    });
+  }
+
+  if (rows.length === 0) {
+    rows.push({ label: '解锁条件', ok: Boolean(item.can_purchase), text: item.can_purchase ? '已满足' : '登录后查看' });
+  }
+
+  return rows;
 }
 
 function canClickBuy(item) {
@@ -322,6 +370,38 @@ onMounted(fetchProducts);
   display: grid;
   gap: 8px;
   min-width: 82px;
+}
+
+.unlock-mini,
+.unlock-panel {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.unlock-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.055);
+  color: rgba(245,242,255,0.68);
+  font-size: 12px;
+}
+
+.unlock-row strong {
+  color: #ffcf9f;
+  font-weight: 800;
+}
+
+.unlock-row strong.ok {
+  color: #b9ffdd;
+}
+
+.detail-row {
+  font-size: 13px;
+  padding: 10px 12px;
 }
 
 .access-tip {
