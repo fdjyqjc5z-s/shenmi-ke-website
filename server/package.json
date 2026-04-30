@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/app.js",
-    "start": "node src/app.js"
+    "start": "node src/app.js",
+    "admin:init": "node scripts/createAdmin.js",
+    "smoke:admin": "node scripts/smokeAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
