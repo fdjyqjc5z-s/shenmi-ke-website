@@ -13,15 +13,39 @@
     <div v-if="loading" class="glass-card" style="margin-top:14px;">正在读取神秘客首页...</div>
     <div v-if="errorMessage" class="glass-card error-text">{{ errorMessage }}</div>
 
+    <div v-if="isLogin" class="glass-card user-card">
+      <div>
+        <div class="brand-kicker">MY ACCESS</div>
+        <h2>{{ profile.nickname || profile.username || '神秘客用户' }}</h2>
+        <p class="muted">身份编码：{{ profile.user_code || '--' }}</p>
+        <p class="muted">邀请码：{{ inviteInfo.invite_code || profile.invite_code || '--' }}</p>
+      </div>
+      <RouterLink class="action-btn ghost-btn small-btn" to="/mine">查看资产</RouterLink>
+    </div>
+
     <div class="grid-2" style="margin-top:14px;">
       <div class="stat-card">
-        <div class="stat-label">新人奖励</div>
-        <div class="stat-value">{{ summary.stats.newcomer_points }} 积分</div>
+        <div class="stat-label">{{ isLogin ? '钱包余额' : '新人奖励' }}</div>
+        <div class="stat-value">{{ isLogin ? assets.wallet.available_balance + ' 元' : summary.stats.newcomer_points + ' 积分' }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">最低提现</div>
-        <div class="stat-value">{{ summary.stats.min_withdraw_amount }} 元</div>
+        <div class="stat-label">{{ isLogin ? '可用积分' : '最低提现' }}</div>
+        <div class="stat-value">{{ isLogin ? assets.points.points_balance : summary.stats.min_withdraw_amount + ' 元' }}</div>
       </div>
+      <div v-if="isLogin" class="stat-card">
+        <div class="stat-label">已邀请</div>
+        <div class="stat-value">{{ inviteInfo.invite_count || 0 }} 人</div>
+      </div>
+      <div v-if="isLogin" class="stat-card">
+        <div class="stat-label">冻结余额</div>
+        <div class="stat-value">{{ assets.wallet.frozen_balance }} 元</div>
+      </div>
+    </div>
+
+    <div v-if="isLogin" class="glass-card invite-card">
+      <p class="muted">我的邀请链接</p>
+      <div class="invite-url">{{ inviteFullUrl }}</div>
+      <button class="action-btn" style="width:100%; margin-top:10px;" @click="copyInviteUrl">复制邀请链接</button>
     </div>
 
     <template v-if="!loading">
@@ -88,11 +112,12 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import http from '../utils/http.js';
 
 const loading = ref(false);
 const errorMessage = ref('');
+const isLogin = computed(() => Boolean(localStorage.getItem('user_token')));
 
 const summary = reactive({
   banners: [],
@@ -103,6 +128,35 @@ const summary = reactive({
     newcomer_points: 50,
     min_withdraw_amount: 1
   }
+});
+
+const profile = reactive({
+  username: '',
+  nickname: '',
+  user_code: '',
+  invite_code: ''
+});
+
+const assets = reactive({
+  wallet: {
+    available_balance: '0.00',
+    frozen_balance: '0.00'
+  },
+  points: {
+    points_balance: 0
+  }
+});
+
+const inviteInfo = reactive({
+  invite_code: '',
+  invite_url: '',
+  invite_count: 0
+});
+
+const inviteFullUrl = computed(() => {
+  const code = inviteInfo.invite_code || profile.invite_code || '';
+  const path = inviteInfo.invite_url || `/login?inviteCode=${code}`;
+  return `${window.location.origin}${path}`;
 });
 
 async function fetchHome() {
@@ -124,12 +178,42 @@ async function fetchHome() {
   }
 }
 
-onMounted(fetchHome);
+async function fetchUserSnapshot() {
+  if (!isLogin.value) return;
+
+  try {
+    const [profileResp, assetsResp, inviteResp] = await Promise.all([
+      http.get('/user/me'),
+      http.get('/user/assets'),
+      http.get('/user/invite')
+    ]);
+
+    Object.assign(profile, profileResp.data.data || {});
+    Object.assign(assets.wallet, assetsResp.data.data?.wallet || {});
+    Object.assign(assets.points, assetsResp.data.data?.points || {});
+    Object.assign(inviteInfo, inviteResp.data.data || {});
+  } catch {
+    // 首页动态资产读取失败不阻断推荐内容展示
+  }
+}
+
+async function copyInviteUrl() {
+  try {
+    await navigator.clipboard.writeText(inviteFullUrl.value);
+  } catch {
+    // 复制失败时保持页面可手动复制
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([fetchHome(), fetchUserSnapshot()]);
+});
 </script>
 
 <style scoped>
 .hero-actions,
-.badge-row {
+.badge-row,
+.user-card {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -138,6 +222,24 @@ onMounted(fetchHome);
 .hero-actions {
   margin-top: 18px;
   flex-wrap: wrap;
+}
+
+.user-card {
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.invite-card {
+  margin-top: 14px;
+}
+
+.invite-url {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.24);
+  border: 1px solid rgba(255,255,255,0.08);
+  word-break: break-all;
+  color: #e6ddff;
 }
 
 .banner-list {
