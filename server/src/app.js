@@ -1,13 +1,11 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import routes from './routes/index.js';
 import { securityConfig } from './config/security.js';
 import { securityHeaders } from './middleware/securityHeaders.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-
-dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
