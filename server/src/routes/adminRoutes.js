@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { adminLogin } from '../controllers/adminAuthController.js';
-import { adminCreateProduct, adminListProducts, adminUpdateProductStatus } from '../controllers/adminProductController.js';
+import { adminCreateProduct, adminListProducts, adminUpdateProduct, adminUpdateProductStatus } from '../controllers/adminProductController.js';
 import { adminListOrders, adminUpdateOrderStatus } from '../controllers/adminOrderController.js';
 import { adminCreateTask, adminListTasks, adminUpdateTaskStatus } from '../controllers/adminTaskController.js';
 import { getDashboardStats } from '../controllers/dashboardController.js';
@@ -22,6 +22,7 @@ router.get('/dashboard/stats', getDashboardStats);
 
 router.get('/products', adminListProducts);
 router.post('/products', adminCreateProduct);
+router.put('/products/:id', adminUpdateProduct);
 router.patch('/products/:id/status', adminUpdateProductStatus);
 
 router.get('/orders', adminListOrders);
