@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h1 class="section-title">任务管理</h1>
-        <p class="muted">发布任务、设置奖励和押金，并审核用户提交的任务进度。</p>
+        <p class="muted">发布任务、设置金额分类、奖励和押金，并审核用户提交的任务进度。</p>
       </div>
       <button class="action-btn" @click="openCreateForm">发布新任务</button>
     </div>
@@ -22,6 +22,10 @@
           <option value="closed">已关闭</option>
           <option value="cancelled">已取消</option>
         </select>
+        <select class="form-input" v-model="filters.amountCategory" @change="fetchTasks">
+          <option value="">全部金额分类</option>
+          <option v-for="item in amountCategories" :key="item.value" :value="item.value">{{ item.label }}</option>
+        </select>
         <button class="action-btn" @click="fetchTasks">查询</button>
       </div>
 
@@ -29,6 +33,9 @@
         <h2>{{ editingId ? '编辑任务' : '发布任务' }}</h2>
         <div class="form-grid">
           <input class="form-input" v-model="form.title" placeholder="任务标题" />
+          <select class="form-input" v-model="form.amountCategory">
+            <option v-for="item in amountCategories" :key="item.value" :value="item.value">{{ item.label }}</option>
+          </select>
           <input class="form-input" v-model="form.deadline" type="datetime-local" placeholder="截止时间" />
           <input class="form-input" v-model.number="form.rewardAmount" type="number" min="0" placeholder="余额奖励" />
           <input class="form-input" v-model.number="form.rewardPoints" type="number" min="0" placeholder="积分奖励" />
@@ -58,6 +65,7 @@
       </div>
 
       <div v-if="errorMessage" class="glass-card danger-card">{{ errorMessage }}</div>
+      <div v-if="successMessage" class="glass-card success-card">{{ successMessage }}</div>
       <div v-if="loading" class="glass-card">正在读取任务...</div>
 
       <div v-else>
@@ -65,6 +73,7 @@
           <div style="flex: 1; min-width: 0;">
             <div class="badge-row">
               <span class="badge">{{ statusText(task.status) }}</span>
+              <span class="badge">{{ amountCategoryText(task.amount_category) }}</span>
               <span v-if="task.vip_only" class="badge">VIP</span>
               <span v-if="task.deposit_required" class="badge">{{ depositText(task.deposit_type) }}押金</span>
             </div>
@@ -105,6 +114,7 @@
           <div style="flex: 1; min-width: 0;">
             <div class="badge-row">
               <span class="badge">{{ submissionStatusText(item.status) }}</span>
+              <span class="badge">{{ amountCategoryText(item.amount_category) }}</span>
               <span class="badge">进度 {{ item.progress_percent }}%</span>
               <span v-if="item.deposit_status === 'frozen'" class="badge">押金冻结中</span>
             </div>
@@ -156,6 +166,7 @@ const activeTab = ref('tasks');
 const loading = ref(false);
 const submissionLoading = ref(false);
 const errorMessage = ref('');
+const successMessage = ref('');
 const showForm = ref(false);
 const editingId = ref(null);
 const tasks = ref([]);
@@ -163,7 +174,15 @@ const submissions = ref([]);
 const reviewPanelVisible = ref(false);
 const activeSubmission = ref(null);
 
-const filters = reactive({ status: '' });
+const amountCategories = [
+  { value: 'micro', label: '微额任务｜0-5元' },
+  { value: 'small', label: '小额任务｜5-20元' },
+  { value: 'medium', label: '中额任务｜20-100元' },
+  { value: 'high', label: '高额任务｜100元以上' },
+  { value: 'custom', label: '自定义金额' }
+];
+
+const filters = reactive({ status: '', amountCategory: '' });
 const submissionFilters = reactive({ status: 'submitted', pageSize: 20 });
 const submissionPagination = reactive({ page: 1, pageSize: 20, total: 0, totalPages: 1 });
 
@@ -175,6 +194,7 @@ const reviewForm = reactive({
 const emptyForm = () => ({
   title: '',
   content: '',
+  amountCategory: 'micro',
   rewardAmount: 0,
   rewardPoints: 0,
   maxAcceptCount: 1,
@@ -187,6 +207,10 @@ const emptyForm = () => ({
 });
 
 const form = reactive(emptyForm());
+
+function amountCategoryText(value) {
+  return amountCategories.find((item) => item.value === value)?.label || '微额任务｜0-5元';
+}
 
 function resetForm() {
   Object.assign(form, emptyForm());
@@ -226,8 +250,14 @@ function formatTime(value) {
 async function fetchTasks() {
   loading.value = true;
   errorMessage.value = '';
+  successMessage.value = '';
   try {
-    const resp = await http.get('/admin/tasks', { params: { status: filters.status } });
+    const resp = await http.get('/admin/tasks', {
+      params: {
+        status: filters.status,
+        amountCategory: filters.amountCategory
+      }
+    });
     tasks.value = resp.data.data || [];
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '任务列表读取失败';
@@ -238,6 +268,7 @@ async function fetchTasks() {
 
 async function submitTask() {
   errorMessage.value = '';
+  successMessage.value = '';
   try {
     const payload = {
       ...form,
@@ -245,6 +276,7 @@ async function submitTask() {
     };
     await http.post('/admin/tasks', payload);
     closeForm();
+    successMessage.value = '任务保存成功';
     await fetchTasks();
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '任务保存失败';
@@ -363,7 +395,7 @@ onMounted(async () => {
 }
 
 .toolbar .form-input {
-  max-width: 220px;
+  max-width: 240px;
   margin-bottom: 0;
 }
 
@@ -419,6 +451,12 @@ onMounted(async () => {
 }
 
 .danger-card {
+  margin-bottom: 14px;
+}
+
+.success-card {
+  color: #b9ffdd;
+  border-color: rgba(80, 255, 174, 0.35);
   margin-bottom: 14px;
 }
 
