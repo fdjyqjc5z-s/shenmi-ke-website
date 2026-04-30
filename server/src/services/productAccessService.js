@@ -1,5 +1,6 @@
 export function isVipActive(user) {
-  if (!user || !user.vip_expire_at) return false;
+  if (!user || !user.vip_level_id) return false;
+  if (!user.vip_expire_at) return true;
   return new Date(user.vip_expire_at).getTime() > Date.now();
 }
 
