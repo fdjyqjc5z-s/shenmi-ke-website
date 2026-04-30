@@ -6,6 +6,8 @@ import { adminCreateTask, adminListTasks, adminUpdateTaskStatus, adminListTaskSu
 import { adminListUsers, adminUpdateUserStatus, adminUpdateUserVip } from '../controllers/adminUserController.js';
 import { adminListWithdrawOrders, adminUpdateWithdrawStatus } from '../controllers/adminWithdrawController.js';
 import { adminCreateAiDraft, adminListAiDrafts, adminUpdateAiDraftStatus } from '../controllers/adminAiController.js';
+import { adminCreateAnnouncement, adminListAnnouncements, adminUpdateAnnouncement, adminUpdateAnnouncementStatus } from '../controllers/adminAnnouncementController.js';
+import { uploadImageMiddleware, handleImageUpload } from '../controllers/adminUploadController.js';
 import { getDashboardStats } from '../controllers/dashboardController.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
@@ -22,6 +24,13 @@ router.post('/login', authLimiter, adminLogin);
 router.use(requireAuth, requireAdmin);
 
 router.get('/dashboard/stats', getDashboardStats);
+
+router.post('/upload/image', uploadImageMiddleware, handleImageUpload);
+
+router.get('/announcements', adminListAnnouncements);
+router.post('/announcements', adminCreateAnnouncement);
+router.put('/announcements/:id', adminUpdateAnnouncement);
+router.patch('/announcements/:id/status', adminUpdateAnnouncementStatus);
 
 router.get('/products', adminListProducts);
 router.post('/products', adminCreateProduct);
