@@ -30,6 +30,8 @@ CREATE TABLE admin_users (
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(32) DEFAULT 'super_admin',
   status ENUM('normal','disabled') DEFAULT 'normal',
+  last_login_ip VARCHAR(64),
+  last_login_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -132,6 +134,7 @@ CREATE TABLE products (
   price DECIMAL(10,2) DEFAULT 0.00,
   points_price INT DEFAULT 0,
   stock INT DEFAULT 0,
+  sales_count INT DEFAULT 0,
   reward_points INT DEFAULT 0,
   vip_only TINYINT DEFAULT 0,
   required_points INT DEFAULT 0,
@@ -298,6 +301,7 @@ CREATE TABLE admin_operation_logs (
 );
 
 CREATE INDEX idx_users_invited_by ON users(invited_by_user_id);
+CREATE INDEX idx_admin_users_status ON admin_users(status);
 CREATE INDEX idx_products_status ON products(status);
 CREATE INDEX idx_products_type ON products(vip_only, is_points_product);
 CREATE INDEX idx_tasks_status ON tasks(status);
