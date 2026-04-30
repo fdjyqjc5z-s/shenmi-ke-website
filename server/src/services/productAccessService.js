@@ -19,6 +19,9 @@ export async function checkProductAccess(connection, userId, product) {
   const details = {
     vip_required: Boolean(product.vip_only),
     vip_active: false,
+    vip_level_id: null,
+    vip_expire_at: null,
+    vip_is_permanent: false,
     points_required: Number(product.required_points || 0),
     points_balance: 0,
     points_missing: 0,
@@ -39,6 +42,9 @@ export async function checkProductAccess(connection, userId, product) {
     return { allowed: false, message: '用户不存在或已被限制', details };
   }
 
+  details.vip_level_id = user.vip_level_id || null;
+  details.vip_expire_at = user.vip_expire_at || null;
+  details.vip_is_permanent = Boolean(user.vip_level_id && !user.vip_expire_at);
   details.vip_active = isVipActive(user);
 
   const [[points]] = await connection.execute(
