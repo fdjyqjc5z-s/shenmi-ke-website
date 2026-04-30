@@ -1,6 +1,32 @@
-import { query, transaction } from '../config/db.js';
+import { dbPool, query, transaction } from '../config/db.js';
 import { createOrderNo } from '../utils/id.js';
 import { checkProductAccess } from '../services/productAccessService.js';
+
+async function attachProductAccess(products, user) {
+  const list = Array.isArray(products) ? products : [products];
+
+  if (!user?.id) {
+    return list.map((item) => ({
+      ...item,
+      can_purchase: false,
+      access_message: '登录后可购买或兑换',
+      access_required: 'login'
+    }));
+  }
+
+  const result = [];
+  for (const item of list) {
+    const access = await checkProductAccess(dbPool, user.id, item);
+    result.push({
+      ...item,
+      can_purchase: access.allowed,
+      access_message: access.message,
+      access_required: access.allowed ? 'none' : 'condition'
+    });
+  }
+
+  return result;
+}
 
 export async function listProducts(req, res, next) {
   try {
@@ -22,7 +48,8 @@ export async function listProducts(req, res, next) {
       params
     );
 
-    return res.json({ success: true, data: rows });
+    const data = await attachProductAccess(rows, req.user);
+    return res.json({ success: true, data });
   } catch (error) {
     return next(error);
   }
@@ -44,7 +71,8 @@ export async function getProductDetail(req, res, next) {
       return res.status(404).json({ success: false, message: '商品不存在或已下架' });
     }
 
-    return res.json({ success: true, data: product });
+    const [data] = await attachProductAccess(product, req.user);
+    return res.json({ success: true, data });
   } catch (error) {
     return next(error);
   }
