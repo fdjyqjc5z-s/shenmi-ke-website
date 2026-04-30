@@ -4,6 +4,7 @@ import userRoutes from './userRoutes.js';
 import productRoutes from './productRoutes.js';
 import taskRoutes from './taskRoutes.js';
 import adminRoutes from './adminRoutes.js';
+import homeRoutes from './homeRoutes.js';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/user', userRoutes);
 router.use('/shop', productRoutes);
 router.use('/task', taskRoutes);
 router.use('/admin', adminRoutes);
+router.use('/home', homeRoutes);
 
 export default router;
