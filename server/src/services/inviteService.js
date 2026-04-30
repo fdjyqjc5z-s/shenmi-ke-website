@@ -13,8 +13,8 @@ export async function bindInviteRelation(connection, inviterUserId, inviteeUserI
   if (!inviterUserId || !inviteeUserId || inviterUserId === inviteeUserId) return;
 
   await connection.execute(
-    `INSERT INTO invite_relations (inviter_user_id, invitee_user_id, invite_code, status)
-     VALUES (:inviterUserId, :inviteeUserId, :inviteCode, 'pending')`,
+    `INSERT INTO invite_relations (inviter_user_id, invitee_user_id, invite_code, status, effective_type, effective_at)
+     VALUES (:inviterUserId, :inviteeUserId, :inviteCode, 'effective', 'register', NOW())`,
     { inviterUserId, inviteeUserId, inviteCode }
   );
 }
