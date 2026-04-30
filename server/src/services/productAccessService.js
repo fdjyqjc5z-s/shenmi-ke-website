@@ -3,6 +3,17 @@ export function isVipActive(user) {
   return new Date(user.vip_expire_at).getTime() > Date.now();
 }
 
+export async function getUserInviteCount(connection, userId) {
+  const [rows] = await connection.execute(
+    `SELECT COUNT(*) AS invite_count
+     FROM invite_relations
+     WHERE inviter_user_id = :userId`,
+    { userId }
+  );
+
+  return Number(rows[0]?.invite_count || 0);
+}
+
 export async function checkProductAccess(connection, userId, product) {
   const [[user]] = await connection.execute(
     `SELECT id, vip_level_id, vip_expire_at
@@ -31,6 +42,14 @@ export async function checkProductAccess(connection, userId, product) {
 
     if (!points || Number(points.points_balance) < Number(product.required_points)) {
       return { allowed: false, message: '积分未达到购买资格' };
+    }
+  }
+
+  if (product.required_invites && Number(product.required_invites) > 0) {
+    const inviteCount = await getUserInviteCount(connection, userId);
+
+    if (inviteCount < Number(product.required_invites)) {
+      return { allowed: false, message: '邀请人数未达到购买资格' };
     }
   }
 
