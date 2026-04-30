@@ -1,4 +1,5 @@
 import { query, transaction } from '../config/db.js';
+import { sanitizeString } from '../utils/validators.js';
 
 export async function listOpenTasks(req, res, next) {
   try {
@@ -213,12 +214,78 @@ export async function acceptTask(req, res, next) {
   }
 }
 
+export async function submitTaskProgress(req, res, next) {
+  try {
+    const acceptId = Number(req.params.acceptId);
+    const content = sanitizeString(req.body.content || '', 3000);
+    const progressPercent = Math.min(Math.max(Number(req.body.progressPercent || req.body.progress_percent || 100), 0), 100);
+    const images = Array.isArray(req.body.images) ? JSON.stringify(req.body.images.slice(0, 9)) : null;
+    const files = Array.isArray(req.body.files) ? JSON.stringify(req.body.files.slice(0, 9)) : null;
+
+    if (!content && !images && !files) {
+      return res.status(400).json({ success: false, message: '请填写任务进度说明或上传凭证' });
+    }
+
+    const result = await transaction(async (connection) => {
+      const [acceptRows] = await connection.execute(
+        `SELECT ta.*, t.status AS task_status
+         FROM task_accepts ta
+         LEFT JOIN tasks t ON t.id = ta.task_id
+         WHERE ta.id = :acceptId AND ta.user_id = :userId
+         FOR UPDATE`,
+        { acceptId, userId: req.user.id }
+      );
+      const accept = acceptRows[0];
+
+      if (!accept) {
+        const error = new Error('任务接单记录不存在');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (!['accepted', 'in_progress', 'submitted'].includes(accept.status)) {
+        const error = new Error('当前任务状态不能提交进度');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const [insertResult] = await connection.execute(
+        `INSERT INTO task_progress (task_accept_id, task_id, user_id, progress_percent, content, images, files, status)
+         VALUES (:acceptId, :taskId, :userId, :progressPercent, :content, :images, :files, 'submitted')`,
+        {
+          acceptId,
+          taskId: accept.task_id,
+          userId: req.user.id,
+          progressPercent,
+          content,
+          images,
+          files
+        }
+      );
+
+      await connection.execute(
+        `UPDATE task_accepts
+         SET status = 'submitted', submitted_at = NOW()
+         WHERE id = :acceptId`,
+        { acceptId }
+      );
+
+      return { id: insertResult.insertId, task_accept_id: acceptId, status: 'submitted' };
+    });
+
+    return res.status(201).json({ success: true, message: '任务进度已提交，等待审核', data: result });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function getMyTaskAccepts(req, res, next) {
   try {
     const rows = await query(
       `SELECT ta.id, ta.task_id, ta.status, ta.accepted_at, ta.submitted_at, ta.deadline,
               ta.deposit_type, ta.deposit_amount, ta.deposit_status,
-              t.title, t.reward_amount, t.reward_points
+              t.title, t.reward_amount, t.reward_points,
+              (SELECT tp.review_comment FROM task_progress tp WHERE tp.task_accept_id = ta.id ORDER BY tp.id DESC LIMIT 1) AS latest_review_comment
        FROM task_accepts ta
        LEFT JOIN tasks t ON t.id = ta.task_id
        WHERE ta.user_id = :userId
