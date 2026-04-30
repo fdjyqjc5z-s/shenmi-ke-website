@@ -134,6 +134,8 @@ CREATE TABLE products (
   stock INT DEFAULT 0,
   reward_points INT DEFAULT 0,
   vip_only TINYINT DEFAULT 0,
+  required_points INT DEFAULT 0,
+  required_invites INT DEFAULT 0,
   is_points_product TINYINT DEFAULT 0,
   status ENUM('on','off') DEFAULT 'off',
   sort_order INT DEFAULT 0,
@@ -273,9 +275,36 @@ CREATE TABLE risk_logs (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE ai_drafts (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  admin_id BIGINT NOT NULL,
+  draft_type ENUM('product','task','reply') NOT NULL,
+  input_text TEXT,
+  output_text TEXT,
+  status ENUM('draft','used','discarded') DEFAULT 'draft',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE admin_operation_logs (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  admin_id BIGINT,
+  action VARCHAR(64) NOT NULL,
+  target_type VARCHAR(64),
+  target_id BIGINT,
+  description VARCHAR(255),
+  ip VARCHAR(64),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX idx_users_invited_by ON users(invited_by_user_id);
+CREATE INDEX idx_products_status ON products(status);
+CREATE INDEX idx_products_type ON products(vip_only, is_points_product);
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_task_accepts_user ON task_accepts(user_id);
 CREATE INDEX idx_orders_user ON orders(user_id);
 CREATE INDEX idx_wallet_logs_user ON wallet_logs(user_id);
 CREATE INDEX idx_points_logs_user ON points_logs(user_id);
+CREATE INDEX idx_ai_drafts_admin ON ai_drafts(admin_id);
+CREATE INDEX idx_admin_logs_admin ON admin_operation_logs(admin_id);
+CREATE INDEX idx_admin_logs_action ON admin_operation_logs(action);
