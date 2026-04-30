@@ -6,6 +6,20 @@ function getBearerToken(req) {
   return header.slice(7).trim();
 }
 
+export function optionalAuth(req, res, next) {
+  const token = getBearerToken(req);
+
+  if (!token) return next();
+
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET || 'development_only_secret');
+  } catch {
+    req.user = null;
+  }
+
+  return next();
+}
+
 export function requireAuth(req, res, next) {
   const token = getBearerToken(req);
 
