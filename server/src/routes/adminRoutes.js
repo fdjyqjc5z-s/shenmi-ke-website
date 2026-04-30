@@ -4,6 +4,7 @@ import { adminCreateProduct, adminListProducts, adminUpdateProduct, adminUpdateP
 import { adminListOrders, adminUpdateOrderStatus } from '../controllers/adminOrderController.js';
 import { adminCreateTask, adminListTasks, adminUpdateTaskStatus } from '../controllers/adminTaskController.js';
 import { adminListUsers, adminUpdateUserStatus, adminUpdateUserVip } from '../controllers/adminUserController.js';
+import { adminListWithdrawOrders, adminUpdateWithdrawStatus } from '../controllers/adminWithdrawController.js';
 import { getDashboardStats } from '../controllers/dashboardController.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
@@ -36,5 +37,8 @@ router.patch('/tasks/:id/status', adminUpdateTaskStatus);
 router.get('/users', adminListUsers);
 router.patch('/users/:id/status', adminUpdateUserStatus);
 router.patch('/users/:id/vip', adminUpdateUserVip);
+
+router.get('/withdraws', adminListWithdrawOrders);
+router.patch('/withdraws/:id/status', adminUpdateWithdrawStatus);
 
 export default router;
