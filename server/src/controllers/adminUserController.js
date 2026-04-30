@@ -1,5 +1,6 @@
-import { query } from '../config/db.js';
+import { query, transaction } from '../config/db.js';
 import { sanitizeString } from '../utils/validators.js';
+import { writeAdminLog } from '../services/adminLogService.js';
 
 export async function adminListUsers(req, res, next) {
   try {
@@ -59,7 +60,18 @@ export async function adminUpdateUserStatus(req, res, next) {
       return res.status(400).json({ success: false, message: '用户状态不合法' });
     }
 
-    await query('UPDATE users SET status = :status WHERE id = :userId', { status, userId });
+    await transaction(async (connection) => {
+      await connection.execute('UPDATE users SET status = :status WHERE id = :userId', { status, userId });
+      await writeAdminLog(connection, {
+        adminId: req.user.id,
+        action: 'user_status_update',
+        targetType: 'user',
+        targetId: userId,
+        description: `更新用户状态：${status}`,
+        ip: req.ip
+      });
+    });
+
     return res.json({ success: true, message: '用户状态已更新' });
   } catch (error) {
     return next(error);
@@ -72,10 +84,25 @@ export async function adminUpdateUserVip(req, res, next) {
     const vipLevelId = Number(req.body.vipLevelId || req.body.vip_level_id || 0) || null;
     const vipExpireAt = req.body.vipExpireAt || req.body.vip_expire_at || null;
 
-    await query(
-      'UPDATE users SET vip_level_id = :vipLevelId, vip_expire_at = :vipExpireAt WHERE id = :userId',
-      { vipLevelId, vipExpireAt, userId }
-    );
+    if (vipLevelId && (!Number.isInteger(vipLevelId) || vipLevelId < 1 || vipLevelId > 99)) {
+      return res.status(400).json({ success: false, message: 'VIP等级不合法' });
+    }
+
+    await transaction(async (connection) => {
+      await connection.execute(
+        'UPDATE users SET vip_level_id = :vipLevelId, vip_expire_at = :vipExpireAt WHERE id = :userId',
+        { vipLevelId, vipExpireAt, userId }
+      );
+
+      await writeAdminLog(connection, {
+        adminId: req.user.id,
+        action: 'user_vip_update',
+        targetType: 'user',
+        targetId: userId,
+        description: `设置用户VIP等级：${vipLevelId || '取消'}，到期：${vipExpireAt || '无'}`,
+        ip: req.ip
+      });
+    });
 
     return res.json({ success: true, message: 'VIP信息已更新' });
   } catch (error) {
