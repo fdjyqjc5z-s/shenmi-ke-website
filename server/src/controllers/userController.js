@@ -84,12 +84,29 @@ export async function getMyInviteInfo(req, res, next) {
       { userId: req.user.id }
     );
 
+    const rewardRows = await query(
+      `SELECT COALESCE(SUM(points), 0) AS total_invite_points
+       FROM points_logs
+       WHERE user_id = :userId AND source_type = 'invite' AND type = 'earn'`,
+      { userId: req.user.id }
+    );
+
+    const effectiveCount = relations.filter((item) => item.status === 'effective').length;
+
     return res.json({
       success: true,
       data: {
         invite_code: user.invite_code,
-        invite_url: `/register?inviteCode=${user.invite_code}`,
+        invite_url: `/login?inviteCode=${user.invite_code}`,
         invite_count: relations.length,
+        effective_invite_count: effectiveCount,
+        pending_invite_count: relations.filter((item) => item.status === 'pending').length,
+        total_invite_points: Number(rewardRows[0]?.total_invite_points || 0),
+        reward_rules: {
+          newcomer_points: 50,
+          inviter_points: 20,
+          effective_condition: '好友通过你的邀请链接注册后立即生效'
+        },
         relations
       }
     });
