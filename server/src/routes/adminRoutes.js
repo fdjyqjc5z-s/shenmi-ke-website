@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { adminLogin } from '../controllers/adminAuthController.js';
 import { adminCreateProduct, adminListProducts, adminUpdateProductStatus } from '../controllers/adminProductController.js';
 import { adminListOrders, adminUpdateOrderStatus } from '../controllers/adminOrderController.js';
+import { getDashboardStats } from '../controllers/dashboardController.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
 import { securityConfig } from '../config/security.js';
@@ -15,6 +16,8 @@ const authLimiter = createRateLimiter({
 router.post('/login', authLimiter, adminLogin);
 
 router.use(requireAuth, requireAdmin);
+
+router.get('/dashboard/stats', getDashboardStats);
 
 router.get('/products', adminListProducts);
 router.post('/products', adminCreateProduct);
