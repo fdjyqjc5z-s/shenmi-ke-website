@@ -4,6 +4,7 @@ import { isPositiveInteger, isPositiveMoney, sanitizeString } from '../utils/val
 function normalizeProductPayload(body) {
   return {
     name: sanitizeString(body.name || '', 128),
+    category: sanitizeString(body.category || 'general', 64) || 'general',
     coverImage: sanitizeString(body.coverImage || body.cover_image || '', 255),
     price: Number(body.price || 0),
     pointsPrice: Number(body.pointsPrice || body.points_price || 0),
@@ -20,6 +21,7 @@ function normalizeProductPayload(body) {
 
 function validateProductPayload(data) {
   if (!data.name) return '商品名称不能为空';
+  if (!data.category) return '商品分类不能为空';
   if (!isPositiveMoney(data.price)) return '商品价格不合法';
   if (!isPositiveInteger(data.pointsPrice)) return '积分价格不合法';
   if (!isPositiveInteger(data.stock)) return '库存不合法';
@@ -35,6 +37,7 @@ export async function adminListProducts(req, res, next) {
     const keyword = sanitizeString(req.query.keyword || '', 64);
     const status = ['on', 'off'].includes(req.query.status) ? req.query.status : '';
     const type = ['normal', 'vip', 'points'].includes(req.query.type) ? req.query.type : '';
+    const category = sanitizeString(req.query.category || '', 64);
     const page = Math.max(Number(req.query.page || 1), 1);
     const pageSize = Math.min(Math.max(Number(req.query.pageSize || 20), 1), 100);
     const offset = (page - 1) * pageSize;
@@ -52,6 +55,11 @@ export async function adminListProducts(req, res, next) {
       params.status = status;
     }
 
+    if (category) {
+      conditions.push('category = :category');
+      params.category = category;
+    }
+
     if (type === 'vip') conditions.push('vip_only = 1');
     if (type === 'points') conditions.push('is_points_product = 1');
     if (type === 'normal') conditions.push('vip_only = 0 AND is_points_product = 0');
@@ -59,7 +67,7 @@ export async function adminListProducts(req, res, next) {
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const rows = await query(
-      `SELECT id, name, cover_image, price, points_price, stock, sales_count, reward_points,
+      `SELECT id, name, category, cover_image, price, points_price, stock, sales_count, reward_points,
               vip_only, required_points, required_invites, is_points_product, status, sort_order, created_at
        FROM products
        ${where}
@@ -95,9 +103,9 @@ export async function adminCreateProduct(req, res, next) {
     if (errorMessage) return res.status(400).json({ success: false, message: errorMessage });
 
     const result = await query(
-      `INSERT INTO products (admin_id, name, cover_image, price, points_price, stock, reward_points,
+      `INSERT INTO products (admin_id, name, category, cover_image, price, points_price, stock, reward_points,
                              vip_only, required_points, required_invites, is_points_product, status, sort_order)
-       VALUES (:adminId, :name, :coverImage, :price, :pointsPrice, :stock, :rewardPoints,
+       VALUES (:adminId, :name, :category, :coverImage, :price, :pointsPrice, :stock, :rewardPoints,
                :vipOnly, :requiredPoints, :requiredInvites, :isPointsProduct, :status, :sortOrder)`,
       { adminId: req.user.id, ...data }
     );
@@ -118,6 +126,7 @@ export async function adminUpdateProduct(req, res, next) {
     await query(
       `UPDATE products
        SET name = :name,
+           category = :category,
            cover_image = :coverImage,
            price = :price,
            points_price = :pointsPrice,
