@@ -15,6 +15,7 @@
         <RouterLink to="/admin/tasks" class="nav-item">任务管理</RouterLink>
         <RouterLink to="/admin/users" class="nav-item">用户管理</RouterLink>
         <RouterLink to="/admin/withdraws" class="nav-item">提现管理</RouterLink>
+        <RouterLink to="/admin/announcements" class="nav-item">公告管理</RouterLink>
         <RouterLink to="/admin/ai" class="nav-item">AI 助手</RouterLink>
       </nav>
 
