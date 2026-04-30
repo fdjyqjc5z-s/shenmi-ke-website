@@ -3,6 +3,7 @@ import { adminLogin } from '../controllers/adminAuthController.js';
 import { adminCreateProduct, adminListProducts, adminUpdateProduct, adminUpdateProductStatus } from '../controllers/adminProductController.js';
 import { adminListOrders, adminUpdateOrderStatus } from '../controllers/adminOrderController.js';
 import { adminCreateTask, adminListTasks, adminUpdateTaskStatus } from '../controllers/adminTaskController.js';
+import { adminListUsers, adminUpdateUserStatus, adminUpdateUserVip } from '../controllers/adminUserController.js';
 import { getDashboardStats } from '../controllers/dashboardController.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
@@ -31,5 +32,9 @@ router.patch('/orders/:id/status', adminUpdateOrderStatus);
 router.get('/tasks', adminListTasks);
 router.post('/tasks', adminCreateTask);
 router.patch('/tasks/:id/status', adminUpdateTaskStatus);
+
+router.get('/users', adminListUsers);
+router.patch('/users/:id/status', adminUpdateUserStatus);
+router.patch('/users/:id/vip', adminUpdateUserVip);
 
 export default router;
