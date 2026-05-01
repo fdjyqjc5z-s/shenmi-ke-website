@@ -117,6 +117,29 @@ export async function getMyInviteInfo(req, res, next) {
       { userId: req.user.id }
     );
 
+    const rebateRows = await query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN reward_type = 'buyer_rebate' THEN reward_amount ELSE 0 END), 0) AS total_buyer_rebate,
+         COALESCE(SUM(CASE WHEN reward_type = 'owner_rebate' THEN reward_amount ELSE 0 END), 0) AS total_owner_rebate,
+         COALESCE(SUM(reward_amount), 0) AS total_distribution_rebate
+       FROM distribution_reward_logs
+       WHERE receiver_user_id = :userId AND status = 'paid'`,
+      { userId: req.user.id }
+    );
+
+    const rebateLogs = await query(
+      `SELECT l.id, l.order_no, l.buyer_user_id, l.receiver_user_id, l.owner_user_id,
+              l.reward_type, l.reward_rule_type, l.reward_rule_value, l.reward_amount,
+              l.status, l.paid_at, l.created_at,
+              buyer.username AS buyer_username, buyer.nickname AS buyer_nickname, buyer.user_code AS buyer_user_code
+       FROM distribution_reward_logs l
+       LEFT JOIN users buyer ON buyer.id = l.buyer_user_id
+       WHERE l.receiver_user_id = :userId
+       ORDER BY l.id DESC
+       LIMIT 50`,
+      { userId: req.user.id }
+    );
+
     const effectiveCount = relations.filter((item) => item.status === 'effective').length;
 
     return res.json({
@@ -125,15 +148,20 @@ export async function getMyInviteInfo(req, res, next) {
         invite_code: user.invite_code,
         invite_url: `/login?inviteCode=${user.invite_code}`,
         bound_inviter: boundInviter,
+        is_bound_distribution: Boolean(boundInviter),
         invite_count: relations.length,
         effective_invite_count: effectiveCount,
         pending_invite_count: relations.filter((item) => item.status === 'pending').length,
         total_invite_points: Number(rewardRows[0]?.total_invite_points || 0),
+        total_buyer_rebate: Number(rebateRows[0]?.total_buyer_rebate || 0),
+        total_owner_rebate: Number(rebateRows[0]?.total_owner_rebate || 0),
+        total_distribution_rebate: Number(rebateRows[0]?.total_distribution_rebate || 0),
+        rebate_logs: rebateLogs,
         reward_rules: {
           newcomer_points: 50,
           inviter_points: 20,
           bind_points: BIND_INVITE_REWARD_POINTS,
-          effective_condition: '好友通过你的邀请链接注册，或登录后绑定你的分销码后立即生效'
+          effective_condition: '登录后绑定分销码，之后购买商品时按后台规则获得返利'
         },
         relations
       }
