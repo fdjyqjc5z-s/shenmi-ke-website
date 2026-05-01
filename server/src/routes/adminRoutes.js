@@ -7,6 +7,7 @@ import { adminListUsers, adminUpdateUserStatus, adminUpdateUserVip } from '../co
 import { adminListWithdrawOrders, adminUpdateWithdrawStatus } from '../controllers/adminWithdrawController.js';
 import { adminCreateAiDraft, adminListAiDrafts, adminUpdateAiDraftStatus } from '../controllers/adminAiController.js';
 import { adminCreateAnnouncement, adminDeleteAnnouncement, adminListAnnouncements, adminUpdateAnnouncement, adminUpdateAnnouncementStatus } from '../controllers/adminAnnouncementController.js';
+import { adminApplyDistributionForOrder, adminGetDistributionOverview, adminUpdateDistributionSettings, adminUpdateDistributionUserRule } from '../controllers/adminDistributionController.js';
 import { uploadImageMiddleware, handleImageUpload } from '../controllers/adminUploadController.js';
 import { getDashboardStats } from '../controllers/dashboardController.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';
@@ -33,6 +34,11 @@ router.put('/announcements/:id', adminUpdateAnnouncement);
 router.patch('/announcements/:id/status', adminUpdateAnnouncementStatus);
 router.delete('/announcements/:id', adminDeleteAnnouncement);
 
+router.get('/distribution/overview', adminGetDistributionOverview);
+router.put('/distribution/settings', adminUpdateDistributionSettings);
+router.put('/distribution/users/:userId/rule', adminUpdateDistributionUserRule);
+router.post('/distribution/orders/:orderId/apply', adminApplyDistributionForOrder);
+
 router.get('/products', adminListProducts);
 router.post('/products', adminCreateProduct);
 router.put('/products/:id', adminUpdateProduct);
@@ -40,6 +46,7 @@ router.patch('/products/:id/status', adminUpdateProductStatus);
 
 router.get('/orders', adminListOrders);
 router.patch('/orders/:id/status', adminUpdateOrderStatus);
+router.post('/orders/:orderId/distribution/apply', adminApplyDistributionForOrder);
 
 router.get('/tasks', adminListTasks);
 router.post('/tasks', adminCreateTask);
