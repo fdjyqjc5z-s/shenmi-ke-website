@@ -3,7 +3,7 @@
     <div class="hero-card">
       <div class="brand-kicker">IDENTITY CARD</div>
       <h1 class="brand-title"><span>我的身份</span></h1>
-      <p class="muted">身份编码、钱包、积分、邀请关系和提现申请集中展示。</p>
+      <p class="muted">身份编码、钱包、积分、分销绑定、返利记录、公告和提现申请集中展示。</p>
     </div>
 
     <div v-if="!isLogin" class="glass-card" style="margin-top:14px;">
@@ -22,8 +22,8 @@
           <div class="stat-value">{{ assets.points.points_balance }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">冻结余额</div>
-          <div class="stat-value">{{ assets.wallet.frozen_balance }} 元</div>
+          <div class="stat-label">分销返利</div>
+          <div class="stat-value">{{ inviteInfo.total_distribution_rebate || 0 }} 元</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">累计提现</div>
@@ -37,8 +37,57 @@
         <p class="muted">身份编码</p>
         <h2>{{ profile.user_code }}</h2>
         <p class="muted">账号：{{ profile.username }} | 昵称：{{ profile.nickname || '--' }}</p>
-        <p class="muted">邀请码：{{ profile.invite_code }}</p>
+        <p class="muted">我的邀请码：{{ profile.invite_code }}</p>
+        <p class="muted">绑定上级：{{ boundInviterText }}</p>
         <button class="action-btn ghost-btn" style="width:100%; margin-top:10px;" @click="logout">退出登录</button>
+      </div>
+
+      <h2 class="section-title">绑定分销码</h2>
+      <div class="glass-card">
+        <template v-if="inviteInfo.is_bound_distribution">
+          <div class="badge">已绑定</div>
+          <h3>{{ boundInviterText }}</h3>
+          <p class="muted">谁的邀请码被绑定，谁就是你的一级上级。绑定后不能重复更换。</p>
+        </template>
+        <template v-else>
+          <p class="muted">输入平台提供的分销码，绑定后你的购买返利和上级返现会按后台规则计算。</p>
+          <input class="form-input" v-model="bindForm.inviteCode" placeholder="请输入分销码 / 邀请码" />
+          <button class="action-btn" style="width:100%;" :disabled="loading" @click="submitBindInviteCode">确认绑定</button>
+        </template>
+      </div>
+
+      <h2 class="section-title">分销返利</h2>
+      <div class="glass-card">
+        <div class="invite-summary">
+          <div>
+            <div class="stat-label">总返利</div>
+            <div class="stat-value">{{ inviteInfo.total_distribution_rebate || 0 }} 元</div>
+          </div>
+          <div>
+            <div class="stat-label">客户返利</div>
+            <div class="stat-value">{{ inviteInfo.total_buyer_rebate || 0 }} 元</div>
+          </div>
+          <div>
+            <div class="stat-label">上级返现</div>
+            <div class="stat-value">{{ inviteInfo.total_owner_rebate || 0 }} 元</div>
+          </div>
+        </div>
+        <p class="muted reward-rule">{{ inviteInfo.reward_rules?.effective_condition || '绑定分销码后按后台设置发放返利。' }}</p>
+      </div>
+
+      <h2 class="section-title">返利记录</h2>
+      <div v-if="inviteInfo.rebate_logs.length === 0" class="glass-card muted">暂无返利记录。订单完成并触发返利后会显示在这里。</div>
+      <div v-else class="list-card" v-for="log in inviteInfo.rebate_logs" :key="log.id">
+        <div style="flex:1; min-width:0;">
+          <div class="badge-row">
+            <span class="badge">{{ rewardTypeText(log.reward_type) }}</span>
+            <span class="badge">{{ log.status }}</span>
+          </div>
+          <h3>{{ log.order_no }}</h3>
+          <p class="muted">购买用户：{{ log.buyer_nickname || log.buyer_username || '--' }} / {{ log.buyer_user_code || '--' }}</p>
+          <p class="muted">返利金额：{{ log.reward_amount }} 元 | 规则：{{ ruleText(log.reward_rule_type, log.reward_rule_value) }}</p>
+          <p class="muted">发放时间：{{ formatTime(log.paid_at || log.created_at) }}</p>
+        </div>
       </div>
 
       <h2 class="section-title">邀请好友</h2>
@@ -53,7 +102,7 @@
             <div class="stat-value">{{ inviteInfo.effective_invite_count || 0 }}</div>
           </div>
           <div>
-            <div class="stat-label">邀请奖励</div>
+            <div class="stat-label">积分奖励</div>
             <div class="stat-value">{{ inviteInfo.total_invite_points || 0 }}</div>
           </div>
         </div>
@@ -77,6 +126,17 @@
           <h3>{{ item.nickname || item.username || '神秘客用户' }}</h3>
           <p class="muted">用户编码：{{ item.user_code || '--' }}</p>
           <p class="muted">注册时间：{{ formatTime(item.created_at) }} | 生效时间：{{ formatTime(item.effective_at) }}</p>
+        </div>
+      </div>
+
+      <h2 class="section-title">平台公告</h2>
+      <div v-if="announcements.length === 0" class="glass-card muted">暂无公告</div>
+      <div v-else class="list-card" v-for="item in announcements" :key="item.id">
+        <div style="flex:1; min-width:0;">
+          <div class="badge">公告</div>
+          <h3>{{ item.title }}</h3>
+          <p class="muted announcement-content">{{ item.content }}</p>
+          <p class="muted">发布时间：{{ formatTime(item.created_at) }}</p>
         </div>
       </div>
 
@@ -148,18 +208,26 @@ const assets = reactive({
 const inviteInfo = reactive({
   invite_code: '',
   invite_url: '',
+  bound_inviter: null,
+  is_bound_distribution: false,
   invite_count: 0,
   effective_invite_count: 0,
   pending_invite_count: 0,
   total_invite_points: 0,
+  total_buyer_rebate: 0,
+  total_owner_rebate: 0,
+  total_distribution_rebate: 0,
+  rebate_logs: [],
   reward_rules: {
     newcomer_points: 50,
     inviter_points: 20,
-    effective_condition: '好友通过你的邀请链接注册后立即生效'
+    bind_points: 20,
+    effective_condition: '绑定分销码后按后台设置发放返利。'
   },
   relations: []
 });
 
+const bindForm = reactive({ inviteCode: '' });
 const withdrawForm = reactive({
   amount: 1,
   withdrawMethod: 'manual',
@@ -168,10 +236,17 @@ const withdrawForm = reactive({
 });
 
 const withdrawOrders = ref([]);
+const announcements = ref([]);
 
 const inviteFullUrl = computed(() => {
   const path = inviteInfo.invite_url || `/login?inviteCode=${profile.invite_code}`;
   return `${window.location.origin}${path}`;
+});
+
+const boundInviterText = computed(() => {
+  const inviter = inviteInfo.bound_inviter;
+  if (!inviter) return '未绑定上级';
+  return `${inviter.nickname || inviter.username || '上级用户'}｜编码 ${inviter.user_code || '--'}｜邀请码 ${inviter.invite_code || '--'}`;
 });
 
 function withdrawStatusText(status) {
@@ -182,6 +257,17 @@ function withdrawStatusText(status) {
 function inviteStatusText(status) {
   const map = { pending: '待生效', effective: '已生效', invalid: '无效' };
   return map[status] || status;
+}
+
+function rewardTypeText(type) {
+  const map = { buyer_rebate: '客户返利', owner_rebate: '上级返现' };
+  return map[type] || type;
+}
+
+function ruleText(type, value) {
+  const number = Number(value || 0);
+  if (!number) return '未设置';
+  return type === 'percent' ? `${number}%` : `${number} 元`;
 }
 
 function methodText(method) {
@@ -200,11 +286,12 @@ async function loadMine() {
   errorMessage.value = '';
 
   try {
-    const [profileResp, assetsResp, inviteResp, withdrawResp] = await Promise.all([
+    const [profileResp, assetsResp, inviteResp, withdrawResp, homeResp] = await Promise.all([
       http.get('/user/me'),
       http.get('/user/assets'),
       http.get('/user/invite'),
-      http.get('/user/withdraw-orders')
+      http.get('/user/withdraw-orders'),
+      http.get('/home/summary')
     ]);
 
     Object.assign(profile, profileResp.data.data || {});
@@ -212,10 +299,30 @@ async function loadMine() {
     Object.assign(assets.points, assetsResp.data.data?.points || {});
     Object.assign(inviteInfo, inviteResp.data.data || {});
     withdrawOrders.value = withdrawResp.data.data || [];
+    announcements.value = homeResp.data.data?.announcements || [];
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '我的信息读取失败，请重新登录';
   } finally {
     loading.value = false;
+  }
+}
+
+async function submitBindInviteCode() {
+  errorMessage.value = '';
+  successMessage.value = '';
+
+  if (!bindForm.inviteCode) {
+    errorMessage.value = '请输入分销码';
+    return;
+  }
+
+  try {
+    await http.post('/user/bind-invite', { inviteCode: bindForm.inviteCode });
+    bindForm.inviteCode = '';
+    successMessage.value = '分销码绑定成功';
+    await loadMine();
+  } catch (error) {
+    errorMessage.value = error.response?.data?.message || '分销码绑定失败';
   }
 }
 
@@ -282,6 +389,10 @@ onMounted(loadMine);
 .reward-rule {
   margin-bottom: 0;
   font-size: 13px;
+}
+
+.announcement-content {
+  white-space: pre-wrap;
 }
 
 .error-text {
