@@ -14,28 +14,46 @@ export async function adminListUsers(req, res, next) {
     const params = { pageSize, offset };
 
     if (keyword) {
-      conditions.push('(username LIKE :keyword OR nickname LIKE :keyword OR user_code LIKE :keyword)');
+      conditions.push('(u.username LIKE :keyword OR u.nickname LIKE :keyword OR u.user_code LIKE :keyword OR u.invite_code LIKE :keyword OR inviter.username LIKE :keyword OR inviter.user_code LIKE :keyword OR inviter.invite_code LIKE :keyword)');
       params.keyword = `%${keyword}%`;
     }
 
     if (status) {
-      conditions.push('status = :status');
+      conditions.push('u.status = :status');
       params.status = status;
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const rows = await query(
-      `SELECT id, user_code, username, nickname, invite_code, invited_by_user_id,
-              vip_level_id, vip_expire_at, status, withdraw_status, created_at
-       FROM users
+      `SELECT u.id, u.user_code, u.username, u.nickname, u.invite_code, u.invited_by_user_id,
+              u.vip_level_id, u.vip_expire_at, u.status, u.withdraw_status, u.created_at,
+              inviter.user_code AS inviter_user_code,
+              inviter.username AS inviter_username,
+              inviter.nickname AS inviter_nickname,
+              inviter.invite_code AS inviter_invite_code,
+              COALESCE(children.child_count, 0) AS level1_child_count
+       FROM users u
+       LEFT JOIN users inviter ON inviter.id = u.invited_by_user_id
+       LEFT JOIN (
+         SELECT invited_by_user_id, COUNT(*) AS child_count
+         FROM users
+         WHERE invited_by_user_id IS NOT NULL
+         GROUP BY invited_by_user_id
+       ) children ON children.invited_by_user_id = u.id
        ${where}
-       ORDER BY id DESC
+       ORDER BY u.id DESC
        LIMIT :pageSize OFFSET :offset`,
       params
     );
 
-    const totalRows = await query(`SELECT COUNT(*) AS total FROM users ${where}`, params);
+    const totalRows = await query(
+      `SELECT COUNT(*) AS total
+       FROM users u
+       LEFT JOIN users inviter ON inviter.id = u.invited_by_user_id
+       ${where}`,
+      params
+    );
     const total = totalRows[0]?.total || 0;
 
     return res.json({
