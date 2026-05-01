@@ -7,10 +7,31 @@
     </div>
 
     <div class="glass-card filter-bar">
+      <button class="category-main-btn" @click="categoryPanelVisible = !categoryPanelVisible">
+        <span>分类</span>
+        <strong>{{ activeCategoryLabel }}</strong>
+      </button>
       <button class="filter-btn" :class="{ active: filters.type === 'all' }" @click="changeType('all')">全部</button>
       <button class="filter-btn" :class="{ active: filters.type === 'normal' }" @click="changeType('normal')">普通</button>
       <button class="filter-btn" :class="{ active: filters.type === 'points' }" @click="changeType('points')">积分</button>
       <button class="filter-btn" :class="{ active: filters.type === 'vip' }" @click="changeType('vip')">VIP</button>
+    </div>
+
+    <div v-if="categoryPanelVisible" class="glass-card category-panel">
+      <button class="category-chip" :class="{ active: !filters.category }" @click="changeCategory('')">
+        <span>全部分类</span>
+        <em>ALL</em>
+      </button>
+      <button
+        v-for="item in categories"
+        :key="item.value"
+        class="category-chip"
+        :class="{ active: filters.category === item.value }"
+        @click="changeCategory(item.value)"
+      >
+        <span>{{ item.label }}</span>
+        <em>{{ item.value }}</em>
+      </button>
     </div>
 
     <div v-if="errorMessage" class="glass-card error-text">{{ errorMessage }}</div>
@@ -18,39 +39,35 @@
     <div v-if="loading" class="glass-card" style="margin-top:14px;">正在读取商品...</div>
 
     <template v-else>
-      <h2 class="section-title">商品列表</h2>
+      <div class="section-head-row">
+        <h2 class="section-title">商品列表</h2>
+        <span class="muted">{{ activeCategoryLabel }} · {{ products.length }} 件</span>
+      </div>
       <div v-if="products.length === 0" class="glass-card muted">暂无可购买商品</div>
 
-      <div class="list-card product-card" v-for="item in products" :key="item.id">
-        <div class="product-cover">
-          <img v-if="item.cover_image" :src="item.cover_image" alt="商品图" />
-          <span v-else>商品</span>
-        </div>
-
-        <div style="flex:1; min-width:0;">
-          <div class="badge-row">
-            <div v-if="item.is_points_product" class="badge">积分兑换</div>
-            <div v-else class="badge">普通商品</div>
-            <div v-if="item.vip_only" class="badge">VIP专属</div>
-            <div v-if="item.can_purchase" class="badge success-badge">可购买</div>
-            <div v-else class="badge lock-badge">未解锁</div>
+      <div v-else class="product-grid">
+        <div class="product-card-grid" v-for="item in products" :key="item.id">
+          <div class="product-cover">
+            <img v-if="item.cover_image" :src="item.cover_image" alt="商品图" />
+            <span v-else>商品</span>
           </div>
-          <h3>{{ item.name }}</h3>
-          <p class="muted">{{ priceText(item) }}</p>
-          <p class="muted">库存：{{ item.stock }} | 销量：{{ item.sales_count || 0 }} | 奖励积分：{{ item.reward_points }}</p>
-          <p v-if="item.required_points || item.required_invites" class="muted">门槛：{{ item.required_points }} 积分 / {{ item.required_invites }} 邀请</p>
-          <div class="unlock-mini">
-            <div v-for="row in unlockRows(item)" :key="row.label" class="unlock-row">
-              <span>{{ row.label }}</span>
-              <strong :class="{ ok: row.ok }">{{ row.text }}</strong>
+
+          <div class="product-content">
+            <div class="badge-row compact-badges">
+              <div class="badge">{{ item.category_label || '综合商品' }}</div>
+              <div v-if="item.is_points_product" class="badge">积分</div>
+              <div v-if="item.vip_only" class="badge">VIP</div>
             </div>
+            <h3 class="product-name">{{ item.name }}</h3>
+            <p class="price-line">{{ priceText(item) }}</p>
+            <p class="muted mini-line">库存 {{ item.stock }} · 销量 {{ item.sales_count || 0 }}</p>
+            <p class="access-tip" :class="{ allowed: item.can_purchase }">{{ item.access_message || '登录后可查看购买资格' }}</p>
           </div>
-          <p class="access-tip" :class="{ allowed: item.can_purchase }">{{ item.access_message || '登录后可查看购买资格' }}</p>
-        </div>
 
-        <div class="action-stack">
-          <button class="action-btn ghost-btn" @click="openDetail(item)">详情</button>
-          <button class="action-btn" :class="{ 'ghost-btn': !canClickBuy(item) }" @click="handleBuyClick(item)">{{ buyButtonText(item) }}</button>
+          <div class="card-actions">
+            <button class="action-btn ghost-btn small-card-btn" @click="openDetail(item)">详情</button>
+            <button class="action-btn small-card-btn" :class="{ 'ghost-btn': !canClickBuy(item) }" @click="handleBuyClick(item)">{{ buyButtonText(item) }}</button>
+          </div>
         </div>
       </div>
     </template>
@@ -59,6 +76,7 @@
       <div class="glass-card modal-card">
         <div class="badge-row">
           <div class="badge">商品详情</div>
+          <div class="badge">{{ activeProduct?.category_label || '综合商品' }}</div>
           <div v-if="activeProduct?.is_points_product" class="badge">积分兑换</div>
           <div v-if="activeProduct?.vip_only" class="badge">VIP专属</div>
           <div v-if="activeProduct?.can_purchase" class="badge success-badge">可购买</div>
@@ -164,18 +182,26 @@ const ordering = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
 const products = ref([]);
+const categories = ref([]);
 const addresses = ref([]);
 const activeProduct = ref(null);
 const detailVisible = ref(false);
 const orderVisible = ref(false);
 const payVisible = ref(false);
+const categoryPanelVisible = ref(false);
 const isLogin = computed(() => Boolean(localStorage.getItem('user_token')));
 const currentOrder = reactive({ order_no: '', total_amount: '0.00', points_used: 0, status: 'pending' });
-const filters = reactive({ type: 'all' });
+const filters = reactive({ type: 'all', category: '' });
 const orderForm = reactive({ quantity: 1, addressId: 0, receiverName: '', receiverPhone: '', receiverAddress: '', saveAddress: true });
 
+const activeCategoryLabel = computed(() => {
+  if (!filters.category) return '全部分类';
+  return categories.value.find((item) => item.value === filters.category)?.label || '当前分类';
+});
+
 function changeType(type) { filters.type = type; fetchProducts(); }
-function priceText(item) { if (!item) return ''; return item.is_points_product ? `积分兑换：${item.points_price} 积分 | 现金价：${item.price} 元` : `价格：${item.price} 元 | 积分价：${item.points_price}`; }
+function changeCategory(category) { filters.category = category; categoryPanelVisible.value = false; fetchProducts(); }
+function priceText(item) { if (!item) return ''; return item.is_points_product ? `${item.points_price} 积分` : `¥ ${item.price}`; }
 function unlockRows(item) {
   if (!item) return [];
   const details = item.access_details || {};
@@ -188,10 +214,20 @@ function unlockRows(item) {
 }
 function canClickBuy(item) { if (!item) return false; return !isLogin.value || item.can_purchase; }
 function buyButtonText(item) { if (!item) return '下单'; if (!isLogin.value) return '登录购买'; if (!item.can_purchase) return '未解锁'; return item.is_points_product ? '兑换' : '下单'; }
+async function fetchCategories() {
+  try {
+    const resp = await http.get('/shop/categories');
+    categories.value = resp.data.data || [];
+  } catch {
+    categories.value = [];
+  }
+}
 async function fetchProducts() {
   loading.value = true; errorMessage.value = ''; successMessage.value = '';
-  try { const resp = await http.get('/shop/products', { params: { type: filters.type } }); products.value = resp.data.data || []; }
-  catch (error) { errorMessage.value = error.response?.data?.message || '商品列表读取失败'; }
+  try {
+    const resp = await http.get('/shop/products', { params: { type: filters.type, category: filters.category } });
+    products.value = resp.data.data || [];
+  } catch (error) { errorMessage.value = error.response?.data?.message || '商品列表读取失败'; }
   finally { loading.value = false; }
 }
 async function loadAddresses() {
@@ -245,9 +281,9 @@ async function submitOrder() {
 }
 async function copyOrderNo() { try { await navigator.clipboard.writeText(currentOrder.order_no || ''); successMessage.value = '订单号已复制'; } catch { successMessage.value = '请手动复制订单号'; } }
 function closePayPopup() { payVisible.value = false; Object.assign(currentOrder, { order_no: '', total_amount: '0.00', points_used: 0, status: 'pending' }); }
-onMounted(fetchProducts);
+onMounted(async () => { await fetchCategories(); await fetchProducts(); });
 </script>
 
 <style scoped>
-.filter-bar,.badge-row,.modal-actions{display:flex;align-items:center;gap:10px}.filter-bar{flex-wrap:wrap;margin-top:14px}.filter-btn{min-height:38px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:rgba(255,255,255,.72);font-weight:800}.filter-btn.active{color:#080813;background:linear-gradient(135deg,#fff,#9f88ff 55%,#43e8ff)}.product-card{align-items:flex-start}.product-cover,.detail-cover{display:grid;place-items:center;overflow:hidden;background:linear-gradient(135deg,rgba(141,117,255,.65),rgba(56,223,255,.38));color:rgba(255,255,255,.78)}.product-cover{width:64px;height:64px;border-radius:18px;flex-shrink:0}.detail-cover{width:100%;height:180px;border-radius:22px;margin-top:14px}.product-cover img,.detail-cover img{width:100%;height:100%;object-fit:cover}.action-stack{display:grid;gap:8px;min-width:82px}.unlock-mini,.unlock-panel{display:grid;gap:6px;margin-top:8px}.unlock-row{display:flex;justify-content:space-between;gap:8px;padding:7px 9px;border-radius:12px;background:rgba(255,255,255,.055);color:rgba(245,242,255,.68);font-size:12px}.unlock-row strong{color:#ffcf9f;font-weight:800}.unlock-row strong.ok{color:#b9ffdd}.detail-row{font-size:13px;padding:10px 12px}.access-tip{margin:6px 0 0;color:#ffcf9f;font-size:13px}.access-tip.allowed{color:#b9ffdd}.access-panel{padding:12px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#ffcf9f}.access-panel.allowed{color:#b9ffdd}.success-badge{color:#b9ffdd;background:rgba(80,255,174,.14)}.lock-badge{color:#ffcf9f;background:rgba(255,190,120,.14)}.modal-mask{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:rgba(3,3,12,.72);backdrop-filter:blur(10px)}.modal-card{width:min(100%,460px);max-height:82vh;overflow:auto}.address-box{display:grid;gap:10px;margin-top:12px}.address-title{display:flex;align-items:center;justify-content:space-between;color:#fff}.mini-link{border:0;background:transparent;color:#b9ffdd;font-weight:800}.address-option{display:flex;gap:10px;padding:10px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1)}.address-option span{display:grid;gap:4px}.address-option em{font-style:normal;color:rgba(255,255,255,.6);line-height:1.5}.address-option b{width:max-content;padding:2px 8px;border-radius:999px;background:rgba(80,255,174,.14);color:#b9ffdd}.save-row{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.72);font-size:13px}.pay-card{text-align:left}.pay-amount{margin:12px 0 14px;font-size:38px;font-weight:900;letter-spacing:1px;background:linear-gradient(135deg,#fff,#9f88ff 55%,#43e8ff);-webkit-background-clip:text;background-clip:text;color:transparent}.pay-info,.pay-box{display:grid;gap:8px;margin-top:12px;padding:12px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1)}.pay-info p{display:flex;justify-content:space-between;gap:12px;margin:0;color:rgba(255,255,255,.62)}.pay-info strong{color:#fff;text-align:right;word-break:break-all}.pay-qr{display:grid;place-items:center;min-height:120px;border-radius:16px;border:1px dashed rgba(255,255,255,.22);color:rgba(255,255,255,.7);background:rgba(0,0,0,.16)}.error-text{color:#ffb4c1;margin-top:14px}.success-text{color:#b9ffdd;margin-top:14px}button:disabled{opacity:.55}
+.filter-bar,.badge-row,.modal-actions{display:flex;align-items:center;gap:10px}.filter-bar{flex-wrap:wrap;margin-top:14px}.category-main-btn,.filter-btn{min-height:38px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:rgba(255,255,255,.72);font-weight:800}.category-main-btn{display:flex;align-items:center;gap:8px;color:#080813;background:linear-gradient(135deg,#fff,#9f88ff 55%,#43e8ff)}.category-main-btn strong{font-size:12px}.filter-btn.active{color:#080813;background:linear-gradient(135deg,#fff,#9f88ff 55%,#43e8ff)}.category-panel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.category-chip{min-height:62px;padding:10px;border-radius:18px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:#fff;text-align:left;display:grid;gap:4px}.category-chip span{font-weight:900}.category-chip em{font-style:normal;font-size:11px;color:rgba(255,255,255,.48);text-transform:uppercase}.category-chip.active{background:linear-gradient(135deg,rgba(159,136,255,.72),rgba(67,232,255,.36));border-color:rgba(255,255,255,.22)}.section-head-row{display:flex;align-items:center;justify-content:space-between;margin-top:18px}.section-head-row .section-title{margin:0}.product-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.product-card-grid{min-width:0;overflow:hidden;border-radius:22px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.07);backdrop-filter:blur(16px);box-shadow:0 16px 40px rgba(0,0,0,.18)}.product-cover,.detail-cover{display:grid;place-items:center;overflow:hidden;background:linear-gradient(135deg,rgba(141,117,255,.65),rgba(56,223,255,.38));color:rgba(255,255,255,.78)}.product-cover{width:100%;aspect-ratio:1/1;border-radius:22px 22px 0 0}.detail-cover{width:100%;height:180px;border-radius:22px;margin-top:14px}.product-cover img,.detail-cover img{width:100%;height:100%;object-fit:cover}.product-content{padding:10px}.compact-badges{gap:5px;flex-wrap:wrap}.compact-badges .badge{font-size:10px;padding:2px 6px}.product-name{min-height:42px;margin:8px 0 4px;font-size:15px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.price-line{margin:0;font-size:18px;font-weight:900;background:linear-gradient(135deg,#fff,#9f88ff 55%,#43e8ff);-webkit-background-clip:text;background-clip:text;color:transparent}.mini-line{font-size:12px;margin:4px 0}.card-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 10px 10px}.small-card-btn{min-height:34px;padding:0 8px;font-size:12px}.unlock-mini,.unlock-panel{display:grid;gap:6px;margin-top:8px}.unlock-row{display:flex;justify-content:space-between;gap:8px;padding:7px 9px;border-radius:12px;background:rgba(255,255,255,.055);color:rgba(245,242,255,.68);font-size:12px}.unlock-row strong{color:#ffcf9f;font-weight:800}.unlock-row strong.ok{color:#b9ffdd}.detail-row{font-size:13px;padding:10px 12px}.access-tip{margin:6px 0 0;color:#ffcf9f;font-size:12px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}.access-tip.allowed{color:#b9ffdd}.access-panel{padding:12px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#ffcf9f}.access-panel.allowed{color:#b9ffdd}.success-badge{color:#b9ffdd;background:rgba(80,255,174,.14)}.lock-badge{color:#ffcf9f;background:rgba(255,190,120,.14)}.modal-mask{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:rgba(3,3,12,.72);backdrop-filter:blur(10px)}.modal-card{width:min(100%,460px);max-height:82vh;overflow:auto}.address-box{display:grid;gap:10px;margin-top:12px}.address-title{display:flex;align-items:center;justify-content:space-between;color:#fff}.mini-link{border:0;background:transparent;color:#b9ffdd;font-weight:800}.address-option{display:flex;gap:10px;padding:10px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1)}.address-option span{display:grid;gap:4px}.address-option em{font-style:normal;color:rgba(255,255,255,.6);line-height:1.5}.address-option b{width:max-content;padding:2px 8px;border-radius:999px;background:rgba(80,255,174,.14);color:#b9ffdd}.save-row{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.72);font-size:13px}.pay-card{text-align:left}.pay-amount{margin:12px 0 14px;font-size:38px;font-weight:900;letter-spacing:1px;background:linear-gradient(135deg,#fff,#9f88ff 55%,#43e8ff);-webkit-background-clip:text;background-clip:text;color:transparent}.pay-info,.pay-box{display:grid;gap:8px;margin-top:12px;padding:12px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1)}.pay-info p{display:flex;justify-content:space-between;gap:12px;margin:0;color:rgba(255,255,255,.62)}.pay-info strong{color:#fff;text-align:right;word-break:break-all}.pay-qr{display:grid;place-items:center;min-height:120px;border-radius:16px;border:1px dashed rgba(255,255,255,.22);color:rgba(255,255,255,.7);background:rgba(0,0,0,.16)}.error-text{color:#ffb4c1;margin-top:14px}.success-text{color:#b9ffdd;margin-top:14px}button:disabled{opacity:.55}@media (max-width:360px){.product-grid{gap:9px}.product-content{padding:8px}.product-name{font-size:13px}.price-line{font-size:16px}.small-card-btn{font-size:11px;padding:0 5px}}
 </style>
