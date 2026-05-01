@@ -53,22 +53,44 @@ async function attachProductAccess(products, user) {
   return result;
 }
 
+export async function listProductCategories(req, res, next) {
+  try {
+    const rows = await query(
+      `SELECT value, label, sort_order
+       FROM product_categories
+       WHERE status = 'enabled'
+       ORDER BY sort_order DESC, id ASC`
+    );
+
+    return res.json({ success: true, data: rows });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function listProducts(req, res, next) {
   try {
     const type = req.query.type || 'all';
+    const category = clean(req.query.category, 64);
     const params = {};
-    let where = "WHERE status = 'on'";
+    let where = "WHERE p.status = 'on'";
 
-    if (type === 'vip') where += ' AND vip_only = 1';
-    if (type === 'points') where += ' AND is_points_product = 1';
-    if (type === 'normal') where += ' AND vip_only = 0 AND is_points_product = 0';
+    if (type === 'vip') where += ' AND p.vip_only = 1';
+    if (type === 'points') where += ' AND p.is_points_product = 1';
+    if (type === 'normal') where += ' AND p.vip_only = 0 AND p.is_points_product = 0';
+    if (category) {
+      where += ' AND p.category = :category';
+      params.category = category;
+    }
 
     const rows = await query(
-      `SELECT id, name, cover_image, price, points_price, stock, sales_count, reward_points,
-              vip_only, required_points, required_invites, is_points_product, sort_order, created_at
-       FROM products
+      `SELECT p.id, p.name, p.category, COALESCE(pc.label, p.category, '综合商品') AS category_label,
+              p.cover_image, p.price, p.points_price, p.stock, p.sales_count, p.reward_points,
+              p.vip_only, p.required_points, p.required_invites, p.is_points_product, p.sort_order, p.created_at
+       FROM products p
+       LEFT JOIN product_categories pc ON pc.value = p.category
        ${where}
-       ORDER BY sort_order DESC, id DESC
+       ORDER BY p.sort_order DESC, p.id DESC
        LIMIT 100`,
       params
     );
@@ -84,10 +106,12 @@ export async function getProductDetail(req, res, next) {
   try {
     const productId = Number(req.params.id);
     const [product] = await query(
-      `SELECT id, name, cover_image, images, price, points_price, stock, sales_count, reward_points,
-              vip_only, required_points, required_invites, is_points_product, status, created_at
-       FROM products
-       WHERE id = :productId AND status = 'on'
+      `SELECT p.id, p.name, p.category, COALESCE(pc.label, p.category, '综合商品') AS category_label,
+              p.cover_image, p.images, p.price, p.points_price, p.stock, p.sales_count, p.reward_points,
+              p.vip_only, p.required_points, p.required_invites, p.is_points_product, p.status, p.created_at
+       FROM products p
+       LEFT JOIN product_categories pc ON pc.value = p.category
+       WHERE p.id = :productId AND p.status = 'on'
        LIMIT 1`,
       { productId }
     );
