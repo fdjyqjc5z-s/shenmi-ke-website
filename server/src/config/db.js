@@ -13,7 +13,7 @@ export const dbPool = mysql.createPool({
 });
 
 export async function query(sql, params = {}) {
-  const [rows] = await dbPool.execute(sql, params);
+  const [rows] = await dbPool.query(sql, params);
   return rows;
 }
 
@@ -21,6 +21,7 @@ export async function transaction(callback) {
   const connection = await dbPool.getConnection();
   try {
     await connection.beginTransaction();
+    connection.execute = connection.query.bind(connection);
     const result = await callback(connection);
     await connection.commit();
     return result;
