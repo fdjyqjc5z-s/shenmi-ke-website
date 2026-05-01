@@ -15,6 +15,16 @@ function emptyAccessDetails(item) {
   };
 }
 
+function clean(value, max = 255) {
+  return String(value || '').trim().slice(0, max);
+}
+
+function makeHttpError(message, statusCode = 400) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
 async function attachProductAccess(products, user) {
   const list = Array.isArray(products) ? products : [products];
 
@@ -97,11 +107,54 @@ export async function createOrder(req, res, next) {
   try {
     const productId = Number(req.body.productId);
     const quantity = Math.max(Number(req.body.quantity || 1), 1);
-    const receiverName = String(req.body.receiverName || '').trim().slice(0, 64);
-    const receiverPhone = String(req.body.receiverPhone || '').trim().slice(0, 32);
-    const receiverAddress = String(req.body.receiverAddress || '').trim().slice(0, 255);
+    const addressId = Number(req.body.addressId || req.body.address_id || 0);
+    const saveAddress = Boolean(req.body.saveAddress || req.body.save_address);
+    let receiverName = clean(req.body.receiverName || req.body.receiver_name, 64);
+    let receiverPhone = clean(req.body.receiverPhone || req.body.receiver_phone, 32);
+    let receiverAddress = clean(req.body.receiverAddress || req.body.receiver_address, 255);
 
     const result = await transaction(async (connection) => {
+      if (addressId > 0) {
+        const [[address]] = await connection.execute(
+          `SELECT receiver_name, receiver_phone, receiver_address
+           FROM user_addresses
+           WHERE id = :addressId AND user_id = :userId
+           LIMIT 1`,
+          { addressId, userId: req.user.id }
+        );
+
+        if (!address) {
+          throw makeHttpError('选择的收货地址不存在', 404);
+        }
+
+        receiverName = address.receiver_name;
+        receiverPhone = address.receiver_phone;
+        receiverAddress = address.receiver_address;
+      }
+
+      if (!receiverName || !receiverPhone || !receiverAddress) {
+        throw makeHttpError('请填写完整收货信息', 400);
+      }
+
+      if (saveAddress && addressId <= 0) {
+        const [[countRow]] = await connection.execute(
+          'SELECT COUNT(*) AS total FROM user_addresses WHERE user_id = :userId',
+          { userId: req.user.id }
+        );
+        const shouldDefault = Number(countRow?.total || 0) === 0;
+        await connection.execute(
+          `INSERT INTO user_addresses (user_id, receiver_name, receiver_phone, receiver_address, is_default)
+           VALUES (:userId, :receiverName, :receiverPhone, :receiverAddress, :isDefault)`,
+          {
+            userId: req.user.id,
+            receiverName,
+            receiverPhone,
+            receiverAddress,
+            isDefault: shouldDefault ? 1 : 0
+          }
+        );
+      }
+
       const [[product]] = await connection.execute(
         `SELECT * FROM products
          WHERE id = :productId AND status = 'on'
@@ -110,22 +163,16 @@ export async function createOrder(req, res, next) {
       );
 
       if (!product) {
-        const error = new Error('商品不存在或已下架');
-        error.statusCode = 404;
-        throw error;
+        throw makeHttpError('商品不存在或已下架', 404);
       }
 
       if (Number(product.stock) < quantity) {
-        const error = new Error('库存不足');
-        error.statusCode = 400;
-        throw error;
+        throw makeHttpError('库存不足', 400);
       }
 
       const access = await checkProductAccess(connection, req.user.id, product);
       if (!access.allowed) {
-        const error = new Error(access.message);
-        error.statusCode = 403;
-        throw error;
+        throw makeHttpError(access.message, 403);
       }
 
       const totalAmount = Number(product.price) * quantity;
@@ -139,9 +186,7 @@ export async function createOrder(req, res, next) {
         );
 
         if (!points || Number(points.points_balance) < pointsUsed) {
-          const error = new Error('积分不足，无法兑换');
-          error.statusCode = 400;
-          throw error;
+          throw makeHttpError('积分不足，无法兑换', 400);
         }
 
         await connection.execute(
@@ -200,10 +245,16 @@ export async function createOrder(req, res, next) {
       );
 
       return {
+        id: orderResult.insertId,
         order_no: orderNo,
         total_amount: totalAmount,
         points_used: pointsUsed,
-        status: 'pending'
+        points_reward: pointsReward,
+        status: 'pending',
+        pay_status: 'unpaid',
+        receiver_name: receiverName,
+        receiver_phone: receiverPhone,
+        receiver_address: receiverAddress
       };
     });
 
@@ -216,11 +267,14 @@ export async function createOrder(req, res, next) {
 export async function getMyOrders(req, res, next) {
   try {
     const rows = await query(
-      `SELECT order_no, total_amount, points_used, points_reward, status, pay_status, created_at
-       FROM orders
-       WHERE user_id = :userId
-       ORDER BY id DESC
-       LIMIT 50`,
+      `SELECT o.id, o.order_no, o.total_amount, o.points_used, o.points_reward,
+              o.status, o.pay_status, o.receiver_name, o.receiver_phone, o.receiver_address, o.created_at,
+              oi.product_id, oi.product_name, oi.product_image, oi.price, oi.quantity, oi.subtotal
+       FROM orders o
+       LEFT JOIN order_items oi ON oi.order_id = o.id
+       WHERE o.user_id = :userId
+       ORDER BY o.id DESC
+       LIMIT 100`,
       { userId: req.user.id }
     );
 
