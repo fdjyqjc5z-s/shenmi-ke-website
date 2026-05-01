@@ -3,7 +3,7 @@ import { adminLogin } from '../controllers/adminAuthController.js';
 import { adminCreateProduct, adminListProducts, adminUpdateProduct, adminUpdateProductStatus } from '../controllers/adminProductController.js';
 import { adminListOrders, adminUpdateOrderStatus } from '../controllers/adminOrderController.js';
 import { adminCreateTask, adminListTasks, adminUpdateTaskStatus, adminListTaskSubmissions, adminReviewTaskSubmission } from '../controllers/adminTaskController.js';
-import { adminListUsers, adminUpdateUserStatus, adminUpdateUserVip } from '../controllers/adminUserController.js';
+import { adminListUsers, adminUpdateUserInviter, adminUpdateUserStatus, adminUpdateUserVip } from '../controllers/adminUserController.js';
 import { adminListWithdrawOrders, adminUpdateWithdrawStatus } from '../controllers/adminWithdrawController.js';
 import { adminCreateAiDraft, adminListAiDrafts, adminUpdateAiDraftStatus } from '../controllers/adminAiController.js';
 import { adminCreateAnnouncement, adminDeleteAnnouncement, adminListAnnouncements, adminUpdateAnnouncement, adminUpdateAnnouncementStatus } from '../controllers/adminAnnouncementController.js';
@@ -57,6 +57,7 @@ router.patch('/task-submissions/:progressId/review', adminReviewTaskSubmission);
 router.get('/users', adminListUsers);
 router.patch('/users/:id/status', adminUpdateUserStatus);
 router.patch('/users/:id/vip', adminUpdateUserVip);
+router.patch('/users/:id/inviter', adminUpdateUserInviter);
 
 router.get('/withdraws', adminListWithdrawOrders);
 router.patch('/withdraws/:id/status', adminUpdateWithdrawStatus);
