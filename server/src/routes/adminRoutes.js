@@ -1,6 +1,15 @@
 import { Router } from 'express';
 import { adminLogin } from '../controllers/adminAuthController.js';
-import { adminCreateProduct, adminListProducts, adminUpdateProduct, adminUpdateProductStatus } from '../controllers/adminProductController.js';
+import {
+  adminCreateProduct,
+  adminCreateProductCategory,
+  adminListProductCategories,
+  adminListProducts,
+  adminUpdateProduct,
+  adminUpdateProductCategory,
+  adminUpdateProductCategoryStatus,
+  adminUpdateProductStatus
+} from '../controllers/adminProductController.js';
 import { adminListOrders, adminUpdateOrderStatus } from '../controllers/adminOrderController.js';
 import { adminCreateTask, adminListTasks, adminUpdateTaskStatus, adminListTaskSubmissions, adminReviewTaskSubmission } from '../controllers/adminTaskController.js';
 import { adminListUsers, adminUpdateUserInviter, adminUpdateUserStatus, adminUpdateUserVip } from '../controllers/adminUserController.js';
@@ -38,6 +47,11 @@ router.get('/distribution/overview', adminGetDistributionOverview);
 router.put('/distribution/settings', adminUpdateDistributionSettings);
 router.put('/distribution/users/:userId/rule', adminUpdateDistributionUserRule);
 router.post('/distribution/orders/:orderId/apply', adminApplyDistributionForOrder);
+
+router.get('/product-categories', adminListProductCategories);
+router.post('/product-categories', adminCreateProductCategory);
+router.put('/product-categories/:id', adminUpdateProductCategory);
+router.patch('/product-categories/:id/status', adminUpdateProductCategoryStatus);
 
 router.get('/products', adminListProducts);
 router.post('/products', adminCreateProduct);
