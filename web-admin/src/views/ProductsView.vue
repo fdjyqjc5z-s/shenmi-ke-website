@@ -183,9 +183,14 @@ const pagination = reactive({
   totalPages: 1
 });
 
+const enabledCategories = computed(() => {
+  const list = categories.value.filter((item) => item.status === 'enabled');
+  return list.length ? list : [{ value: 'general', label: '综合商品', status: 'enabled' }];
+});
+
 const emptyForm = () => ({
   name: '',
-  category: enabledCategories.value[0]?.value || 'general',
+  category: 'general',
   coverImage: '',
   price: 0,
   pointsPrice: 0,
@@ -210,11 +215,6 @@ const emptyCategoryForm = () => ({
 const form = reactive(emptyForm());
 const categoryForm = reactive(emptyCategoryForm());
 
-const enabledCategories = computed(() => {
-  const list = categories.value.filter((item) => item.status === 'enabled');
-  return list.length ? list : [{ value: 'general', label: '综合商品', status: 'enabled' }];
-});
-
 function categoryText(value) {
   return categories.value.find((item) => item.value === value)?.label || '综合商品';
 }
@@ -231,6 +231,7 @@ function makeCategoryCode(label) {
 
 function resetForm() {
   Object.assign(form, emptyForm());
+  form.category = enabledCategories.value[0]?.value || 'general';
   editingId.value = null;
 }
 
