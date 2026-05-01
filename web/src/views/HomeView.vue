@@ -10,6 +10,16 @@
       </div>
     </div>
 
+    <div v-if="summary.announcements.length" class="notice-panel">
+      <div class="notice-head"><span class="notice-dot"></span><span>平台公告</span></div>
+      <div class="notice-list">
+        <div v-for="item in summary.announcements.slice(0, 2)" :key="item.id" class="notice-item">
+          <strong>{{ item.title }}</strong>
+          <span>{{ item.content }}</span>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="glass-card" style="margin-top:14px;">正在读取神秘客首页...</div>
     <div v-if="errorMessage" class="glass-card error-text">{{ errorMessage }}</div>
 
@@ -51,27 +61,13 @@
     <template v-if="!loading">
       <h2 v-if="summary.banners.length" class="section-title">神秘推荐</h2>
       <div v-if="summary.banners.length" class="banner-list">
-        <a
-          v-for="banner in summary.banners"
-          :key="banner.id"
-          class="banner-card"
-          :href="banner.link_url || 'javascript:void(0)'"
-        >
+        <a v-for="banner in summary.banners" :key="banner.id" class="banner-card" :href="banner.link_url || '#'">
           <img v-if="banner.image_url" :src="banner.image_url" alt="banner" />
           <div class="banner-mask">
             <div class="badge">推荐</div>
             <h3>{{ banner.title || '神秘客推荐' }}</h3>
           </div>
         </a>
-      </div>
-
-      <h2 v-if="summary.announcements.length" class="section-title">平台公告</h2>
-      <div v-if="summary.announcements.length" class="list-card" v-for="item in summary.announcements" :key="item.id">
-        <div>
-          <div class="badge">公告</div>
-          <h3>{{ item.title }}</h3>
-          <p class="muted clamp-text">{{ item.content }}</p>
-        </div>
       </div>
 
       <h2 class="section-title">推荐任务</h2>
@@ -118,51 +114,18 @@ import http from '../utils/http.js';
 const loading = ref(false);
 const errorMessage = ref('');
 const isLogin = computed(() => Boolean(localStorage.getItem('user_token')));
-
-const summary = reactive({
-  banners: [],
-  announcements: [],
-  products: [],
-  tasks: [],
-  stats: {
-    newcomer_points: 50,
-    min_withdraw_amount: 1
-  }
-});
-
-const profile = reactive({
-  username: '',
-  nickname: '',
-  user_code: '',
-  invite_code: ''
-});
-
-const assets = reactive({
-  wallet: {
-    available_balance: '0.00',
-    frozen_balance: '0.00'
-  },
-  points: {
-    points_balance: 0
-  }
-});
-
-const inviteInfo = reactive({
-  invite_code: '',
-  invite_url: '',
-  invite_count: 0
-});
-
+const summary = reactive({ banners: [], announcements: [], products: [], tasks: [], stats: { newcomer_points: 50, min_withdraw_amount: 1 } });
+const profile = reactive({ username: '', nickname: '', user_code: '', invite_code: '' });
+const assets = reactive({ wallet: { available_balance: '0.00', frozen_balance: '0.00' }, points: { points_balance: 0 } });
+const inviteInfo = reactive({ invite_code: '', invite_url: '', invite_count: 0 });
 const inviteFullUrl = computed(() => {
   const code = inviteInfo.invite_code || profile.invite_code || '';
   const path = inviteInfo.invite_url || `/login?inviteCode=${code}`;
   return `${window.location.origin}${path}`;
 });
-
 async function fetchHome() {
   loading.value = true;
   errorMessage.value = '';
-
   try {
     const resp = await http.get('/home/summary');
     const data = resp.data.data || {};
@@ -177,140 +140,22 @@ async function fetchHome() {
     loading.value = false;
   }
 }
-
 async function fetchUserSnapshot() {
   if (!isLogin.value) return;
-
   try {
-    const [profileResp, assetsResp, inviteResp] = await Promise.all([
-      http.get('/user/me'),
-      http.get('/user/assets'),
-      http.get('/user/invite')
-    ]);
-
+    const [profileResp, assetsResp, inviteResp] = await Promise.all([http.get('/user/me'), http.get('/user/assets'), http.get('/user/invite')]);
     Object.assign(profile, profileResp.data.data || {});
     Object.assign(assets.wallet, assetsResp.data.data?.wallet || {});
     Object.assign(assets.points, assetsResp.data.data?.points || {});
     Object.assign(inviteInfo, inviteResp.data.data || {});
-  } catch {
-    // 首页动态资产读取失败不阻断推荐内容展示
-  }
+  } catch {}
 }
-
 async function copyInviteUrl() {
-  try {
-    await navigator.clipboard.writeText(inviteFullUrl.value);
-  } catch {
-    // 复制失败时保持页面可手动复制
-  }
+  try { await navigator.clipboard.writeText(inviteFullUrl.value); } catch {}
 }
-
-onMounted(async () => {
-  await Promise.all([fetchHome(), fetchUserSnapshot()]);
-});
+onMounted(async () => { await Promise.all([fetchHome(), fetchUserSnapshot()]); });
 </script>
 
 <style scoped>
-.hero-actions,
-.badge-row,
-.user-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.hero-actions {
-  margin-top: 18px;
-  flex-wrap: wrap;
-}
-
-.user-card {
-  justify-content: space-between;
-  margin-top: 14px;
-}
-
-.invite-card {
-  margin-top: 14px;
-}
-
-.invite-url {
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(0,0,0,0.24);
-  border: 1px solid rgba(255,255,255,0.08);
-  word-break: break-all;
-  color: #e6ddff;
-}
-
-.banner-list {
-  display: grid;
-  gap: 12px;
-}
-
-.banner-card {
-  position: relative;
-  display: block;
-  min-height: 136px;
-  overflow: hidden;
-  border-radius: 24px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: linear-gradient(135deg, rgba(141,117,255,0.45), rgba(56,223,255,0.25));
-}
-
-.banner-card img {
-  width: 100%;
-  height: 160px;
-  object-fit: cover;
-  display: block;
-}
-
-.banner-mask {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 16px;
-  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.68));
-}
-
-.product-card {
-  align-items: flex-start;
-}
-
-.product-cover {
-  width: 64px;
-  height: 64px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 18px;
-  background: linear-gradient(135deg, rgba(141,117,255,0.65), rgba(56,223,255,0.38));
-  color: rgba(255,255,255,0.78);
-}
-
-.product-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.small-btn {
-  min-height: 38px;
-  padding: 0 12px;
-  flex-shrink: 0;
-}
-
-.clamp-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.error-text {
-  color: #ffb4c1;
-  margin-top: 14px;
-}
+.hero-actions,.badge-row,.user-card{display:flex;align-items:center;gap:10px}.hero-actions{margin-top:18px;flex-wrap:wrap}.notice-panel{margin-top:14px;padding:14px 16px;border-radius:22px;border:1px solid rgba(255,255,255,.13);background:linear-gradient(135deg,rgba(141,117,255,.22),rgba(56,223,255,.16));box-shadow:0 18px 50px rgba(0,0,0,.18);backdrop-filter:blur(16px)}.notice-head{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.82);font-size:12px;letter-spacing:5px;margin-bottom:8px}.notice-dot{width:8px;height:8px;border-radius:999px;background:linear-gradient(135deg,#a78bfa,#38dfff);box-shadow:0 0 18px rgba(56,223,255,.75)}.notice-list{display:grid;gap:8px}.notice-item{display:grid;gap:4px;color:rgba(255,255,255,.9)}.notice-item strong{font-size:15px;letter-spacing:1px}.notice-item span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:rgba(255,255,255,.62);line-height:1.65}.user-card{justify-content:space-between;margin-top:14px}.invite-card{margin-top:14px}.invite-url{padding:12px;border-radius:14px;background:rgba(0,0,0,.24);border:1px solid rgba(255,255,255,.08);word-break:break-all;color:#e6ddff}.banner-list{display:grid;gap:12px}.banner-card{position:relative;display:block;min-height:136px;overflow:hidden;border-radius:24px;border:1px solid rgba(255,255,255,.12);background:linear-gradient(135deg,rgba(141,117,255,.45),rgba(56,223,255,.25))}.banner-card img{width:100%;height:160px;object-fit:cover;display:block}.banner-mask{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:16px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.68))}.product-card{align-items:flex-start}.product-cover{width:64px;height:64px;flex-shrink:0;display:grid;place-items:center;overflow:hidden;border-radius:18px;background:linear-gradient(135deg,rgba(141,117,255,.65),rgba(56,223,255,.38));color:rgba(255,255,255,.78)}.product-cover img{width:100%;height:100%;object-fit:cover}.small-btn{min-height:38px;padding:0 12px;flex-shrink:0}.clamp-text{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.error-text{color:#ffb4c1;margin-top:14px}
 </style>
