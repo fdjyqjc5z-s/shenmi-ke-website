@@ -3,13 +3,13 @@
     <div class="page-head">
       <div>
         <h1 class="section-title">用户管理</h1>
-        <p class="muted">查看用户身份编码、账号状态、提现权限和 VIP 信息。</p>
+        <p class="muted">查看用户身份编码、账号状态、提现权限、VIP 信息和一级分销关系。</p>
       </div>
       <button class="action-btn" @click="fetchUsers(1)">刷新</button>
     </div>
 
     <div class="glass-card toolbar">
-      <input class="form-input" v-model="filters.keyword" placeholder="搜索用户名 / 昵称 / 用户编码" @keyup.enter="fetchUsers(1)" />
+      <input class="form-input" v-model="filters.keyword" placeholder="搜索用户名 / 昵称 / 用户编码 / 邀请码 / 上级" @keyup.enter="fetchUsers(1)" />
       <select class="form-input" v-model="filters.status" @change="fetchUsers(1)">
         <option value="">全部状态</option>
         <option value="normal">正常</option>
@@ -29,10 +29,12 @@
             <span class="badge">{{ statusText(user.status) }}</span>
             <span v-if="user.vip_level_id" class="badge">VIP {{ user.vip_level_id }}</span>
             <span v-if="user.withdraw_status !== 'normal'" class="badge">提现受限</span>
+            <span class="badge">下级 {{ user.level1_child_count || 0 }} 人</span>
           </div>
           <h3>{{ user.nickname || user.username }}</h3>
           <p class="muted">账号：{{ user.username }} | 编码：{{ user.user_code }}</p>
-          <p class="muted">邀请码：{{ user.invite_code }} | 注册时间：{{ formatTime(user.created_at) }}</p>
+          <p class="muted">自己的邀请码：{{ user.invite_code }} | 注册时间：{{ formatTime(user.created_at) }}</p>
+          <p class="muted">绑定上级：{{ inviterText(user) }}</p>
           <p class="muted">VIP到期：{{ user.vip_expire_at || '未开通' }}</p>
         </div>
 
@@ -97,6 +99,11 @@ const vipForm = reactive({
 function statusText(status) {
   const map = { normal: '正常', frozen: '冻结', banned: '封禁' };
   return map[status] || status;
+}
+
+function inviterText(user) {
+  if (!user.invited_by_user_id) return '未绑定上级';
+  return `${user.inviter_nickname || user.inviter_username || '上级用户'}｜编码 ${user.inviter_user_code || '--'}｜邀请码 ${user.inviter_invite_code || '--'}`;
 }
 
 function formatTime(value) {
@@ -191,7 +198,7 @@ onMounted(() => fetchUsers(1));
 }
 
 .toolbar .form-input {
-  max-width: 260px;
+  max-width: 320px;
   margin-bottom: 0;
 }
 
