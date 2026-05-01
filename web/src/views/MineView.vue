@@ -16,7 +16,10 @@
         <div class="stat-card"><div class="stat-label">钱包余额</div><div class="stat-value">{{ assets.wallet.available_balance }} 元</div></div>
         <div class="stat-card"><div class="stat-label">可用积分</div><div class="stat-value">{{ assets.points.points_balance }}</div></div>
         <div class="stat-card"><div class="stat-label">分销返利</div><div class="stat-value">{{ inviteInfo.total_distribution_rebate || 0 }} 元</div></div>
-        <div class="stat-card"><div class="stat-label">购买记录</div><div class="stat-value">{{ myOrders.length }} 单</div></div>
+        <button class="stat-card stat-button" type="button" @click="ordersExpanded = !ordersExpanded">
+          <div class="stat-label">购买记录</div>
+          <div class="stat-value">{{ myOrders.length }} 单</div>
+        </button>
       </div>
 
       <h2 class="section-title">我的通行证</h2>
@@ -59,26 +62,36 @@
         </div>
       </div>
 
-      <h2 class="section-title">购买商品管理</h2>
-      <div v-if="myOrders.length === 0" class="glass-card muted">暂无购买记录。下单成功后会显示在这里。</div>
-      <div v-else class="list-card order-card" v-for="order in myOrders" :key="order.order_no + '-' + order.product_id">
-        <div class="order-cover">
-          <img v-if="order.product_image" :src="order.product_image" alt="商品图" />
-          <span v-else>商品</span>
+      <div class="section-toggle">
+        <div>
+          <h2 class="section-title compact-title">购买商品管理</h2>
+          <p class="muted order-tip">默认折叠，点击展开查看历史订单。</p>
         </div>
-        <div style="flex:1; min-width:0;">
-          <div class="badge-row">
-            <span class="badge">{{ orderStatusText(order.status) }}</span>
-            <span class="badge">{{ payStatusText(order.pay_status) }}</span>
-          </div>
-          <h3>{{ order.product_name || order.order_no }}</h3>
-          <p class="muted">订单号：{{ order.order_no }}</p>
-          <p class="muted">数量：{{ order.quantity || 1 }} | 金额：{{ order.total_amount }} 元 | 积分：{{ order.points_used }}</p>
-          <p class="muted">收货：{{ order.receiver_name || '--' }} / {{ order.receiver_phone || '--' }}</p>
-          <p class="muted address-line">{{ order.receiver_address || '--' }}</p>
-          <p class="muted">下单时间：{{ formatTime(order.created_at) }}</p>
-        </div>
+        <button class="action-btn ghost-btn small-toggle" @click="ordersExpanded = !ordersExpanded">
+          {{ ordersExpanded ? '收起' : `展开 ${myOrders.length} 单` }}
+        </button>
       </div>
+      <template v-if="ordersExpanded">
+        <div v-if="myOrders.length === 0" class="glass-card muted">暂无购买记录。下单成功后会显示在这里。</div>
+        <div v-else class="list-card order-card" v-for="order in myOrders" :key="order.order_no + '-' + order.product_id">
+          <div class="order-cover">
+            <img v-if="order.product_image" :src="order.product_image" alt="商品图" />
+            <span v-else>商品</span>
+          </div>
+          <div style="flex:1; min-width:0;">
+            <div class="badge-row">
+              <span class="badge">{{ orderStatusText(order.status) }}</span>
+              <span class="badge">{{ payStatusText(order.pay_status) }}</span>
+            </div>
+            <h3>{{ order.product_name || order.order_no }}</h3>
+            <p class="muted">订单号：{{ order.order_no }}</p>
+            <p class="muted">数量：{{ order.quantity || 1 }} | 金额：{{ order.total_amount }} 元 | 积分：{{ order.points_used }}</p>
+            <p class="muted">收货：{{ order.receiver_name || '--' }} / {{ order.receiver_phone || '--' }}</p>
+            <p class="muted address-line">{{ order.receiver_address || '--' }}</p>
+            <p class="muted">下单时间：{{ formatTime(order.created_at) }}</p>
+          </div>
+        </div>
+      </template>
 
       <h2 class="section-title">绑定分销码</h2>
       <div class="glass-card">
@@ -176,6 +189,7 @@ const loading = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
 const isLogin = computed(() => Boolean(localStorage.getItem('user_token')));
+const ordersExpanded = ref(false);
 const profile = reactive({ user_code: '', username: '', nickname: '', invite_code: '', vip_level_id: null });
 const assets = reactive({ wallet: { available_balance: '0.00', frozen_balance: '0.00', deposit_frozen_balance: '0.00', total_income: '0.00', total_withdraw: '0.00' }, points: { points_balance: 0, frozen_points: 0, total_earned: 0, total_used: 0 } });
 const inviteInfo = reactive({ invite_code: '', invite_url: '', bound_inviter: null, is_bound_distribution: false, invite_count: 0, effective_invite_count: 0, pending_invite_count: 0, total_invite_points: 0, total_buyer_rebate: 0, total_owner_rebate: 0, total_distribution_rebate: 0, rebate_logs: [], reward_rules: { newcomer_points: 50, inviter_points: 20, bind_points: 20, effective_condition: '绑定分销码后按后台设置发放返利。' }, relations: [] });
@@ -246,5 +260,5 @@ onMounted(loadMine);
 </script>
 
 <style scoped>
-.badge-row,.invite-summary,.form-actions,.row-actions{display:flex;align-items:center;gap:10px}.invite-summary{justify-content:space-between;margin-bottom:14px;padding:12px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08)}.invite-box{padding:12px;border-radius:14px;background:rgba(0,0,0,.24);border:1px solid rgba(255,255,255,.08);word-break:break-all;color:#e6ddff}.reward-rule{margin-bottom:0;font-size:13px}.announcement-content,.address-line{white-space:pre-wrap}.address-form{display:grid;gap:10px}.check-row{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.72);font-size:13px}.form-actions{flex-wrap:wrap}.row-actions{flex-wrap:wrap;justify-content:flex-end;max-width:160px}.success-badge{color:#b9ffdd;background:rgba(80,255,174,.14)}.order-card{align-items:flex-start}.order-cover{width:62px;height:62px;flex-shrink:0;display:grid;place-items:center;overflow:hidden;border-radius:18px;background:linear-gradient(135deg,rgba(141,117,255,.65),rgba(56,223,255,.38));color:rgba(255,255,255,.78)}.order-cover img{width:100%;height:100%;object-fit:cover}.error-text{color:#ffb4c1;font-size:14px;margin-bottom:10px}.success-text{color:#b9ffdd;font-size:14px;margin-bottom:10px}button:disabled{opacity:.55}
+.badge-row,.invite-summary,.form-actions,.row-actions,.section-toggle{display:flex;align-items:center;gap:10px}.invite-summary{justify-content:space-between;margin-bottom:14px;padding:12px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08)}.invite-box{padding:12px;border-radius:14px;background:rgba(0,0,0,.24);border:1px solid rgba(255,255,255,.08);word-break:break-all;color:#e6ddff}.reward-rule{margin-bottom:0;font-size:13px}.announcement-content,.address-line{white-space:pre-wrap}.address-form{display:grid;gap:10px}.check-row{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.72);font-size:13px}.form-actions{flex-wrap:wrap}.row-actions{flex-wrap:wrap;justify-content:flex-end;max-width:160px}.success-badge{color:#b9ffdd;background:rgba(80,255,174,.14)}.section-toggle{justify-content:space-between;margin-top:22px}.compact-title{margin:0}.order-tip{margin:6px 0 0;font-size:13px}.small-toggle{min-height:38px;padding:0 12px;white-space:nowrap}.stat-button{text-align:left;border:1px solid rgba(255,255,255,.1);cursor:pointer;color:inherit}.order-card{align-items:flex-start}.order-cover{width:62px;height:62px;flex-shrink:0;display:grid;place-items:center;overflow:hidden;border-radius:18px;background:linear-gradient(135deg,rgba(141,117,255,.65),rgba(56,223,255,.38));color:rgba(255,255,255,.78)}.order-cover img{width:100%;height:100%;object-fit:cover}.error-text{color:#ffb4c1;font-size:14px;margin-bottom:10px}.success-text{color:#b9ffdd;font-size:14px;margin-bottom:10px}button:disabled{opacity:.55}
 </style>
