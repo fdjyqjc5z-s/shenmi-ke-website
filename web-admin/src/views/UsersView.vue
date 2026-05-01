@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h1 class="section-title">用户管理</h1>
-        <p class="muted">查看用户身份编码、账号状态、提现权限、VIP 信息和一级分销关系。</p>
+        <p class="muted">查看用户身份编码、账号状态、提现权限、VIP 信息和一级分销关系，可手动修改上级。</p>
       </div>
       <button class="action-btn" @click="fetchUsers(1)">刷新</button>
     </div>
@@ -20,6 +20,7 @@
     </div>
 
     <div v-if="errorMessage" class="glass-card danger-card">{{ errorMessage }}</div>
+    <div v-if="successMessage" class="glass-card success-card">{{ successMessage }}</div>
     <div v-if="loading" class="glass-card">正在读取用户...</div>
 
     <div v-else>
@@ -43,6 +44,7 @@
           <button class="action-btn ghost-btn" @click="setStatus(user, 'frozen')">冻结</button>
           <button class="action-btn" @click="setStatus(user, 'banned')">封禁</button>
           <button class="action-btn" @click="openVipForm(user)">VIP</button>
+          <button class="action-btn ghost-btn" @click="openInviterForm(user)">改上级</button>
         </div>
       </div>
 
@@ -65,6 +67,21 @@
         </div>
       </div>
     </div>
+
+    <div v-if="inviterPanelVisible" class="modal-mask">
+      <div class="glass-card modal-card">
+        <h2>修改上级</h2>
+        <p class="muted">当前用户：{{ activeUser?.username }} / {{ activeUser?.user_code }}</p>
+        <p class="muted">当前上级：{{ activeUser ? inviterText(activeUser) : '--' }}</p>
+        <input class="form-input" v-model="inviterForm.keyword" placeholder="输入新上级的邀请码 / 用户编码 / 账号" />
+        <p class="muted mini-tip">保存后，该用户的一级上级会变成你输入的邀请码所属账户；清空上级会停用该用户已有分销规则。</p>
+        <div class="form-actions wrap-actions">
+          <button class="action-btn" @click="submitInviter(false)">保存上级</button>
+          <button class="action-btn ghost-btn" @click="submitInviter(true)">清空上级</button>
+          <button class="action-btn ghost-btn" @click="closeInviterForm">取消</button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -74,8 +91,10 @@ import http from '../utils/http.js';
 
 const loading = ref(false);
 const errorMessage = ref('');
+const successMessage = ref('');
 const users = ref([]);
 const vipPanelVisible = ref(false);
+const inviterPanelVisible = ref(false);
 const activeUser = ref(null);
 
 const filters = reactive({
@@ -94,6 +113,10 @@ const pagination = reactive({
 const vipForm = reactive({
   vipLevelId: 1,
   vipExpireAt: ''
+});
+
+const inviterForm = reactive({
+  keyword: ''
 });
 
 function statusText(status) {
@@ -135,8 +158,10 @@ async function fetchUsers(page = pagination.page) {
 
 async function setStatus(user, status) {
   errorMessage.value = '';
+  successMessage.value = '';
   try {
     await http.patch('/admin/users/' + user.id + '/status', { status });
+    successMessage.value = '用户状态已更新';
     await fetchUsers(pagination.page);
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '用户状态更新失败';
@@ -160,15 +185,52 @@ function closeVipForm() {
 async function submitVip() {
   if (!activeUser.value) return;
   errorMessage.value = '';
+  successMessage.value = '';
   try {
     await http.patch('/admin/users/' + activeUser.value.id + '/vip', {
       vipLevelId: vipForm.vipLevelId,
       vipExpireAt: vipForm.vipExpireAt ? vipForm.vipExpireAt.replace('T', ' ') + ':00' : null
     });
+    successMessage.value = 'VIP信息已更新';
     closeVipForm();
     await fetchUsers(pagination.page);
   } catch (error) {
     errorMessage.value = error.response?.data?.message || 'VIP信息更新失败';
+  }
+}
+
+function openInviterForm(user) {
+  activeUser.value = user;
+  inviterForm.keyword = user.inviter_invite_code || '';
+  inviterPanelVisible.value = true;
+}
+
+function closeInviterForm() {
+  inviterPanelVisible.value = false;
+  activeUser.value = null;
+  inviterForm.keyword = '';
+}
+
+async function submitInviter(clear = false) {
+  if (!activeUser.value) return;
+  errorMessage.value = '';
+  successMessage.value = '';
+
+  if (!clear && !inviterForm.keyword) {
+    errorMessage.value = '请输入新上级的邀请码、用户编码或账号';
+    return;
+  }
+
+  try {
+    const resp = await http.patch('/admin/users/' + activeUser.value.id + '/inviter', {
+      inviterCode: inviterForm.keyword,
+      clear
+    });
+    successMessage.value = resp.data?.message || '用户上级已更新';
+    closeInviterForm();
+    await fetchUsers(pagination.page);
+  } catch (error) {
+    errorMessage.value = error.response?.data?.message || '用户上级更新失败';
   }
 }
 
@@ -205,7 +267,7 @@ onMounted(() => fetchUsers(1));
 .row-actions {
   flex-wrap: wrap;
   justify-content: flex-end;
-  max-width: 260px;
+  max-width: 280px;
 }
 
 .pagination {
@@ -224,11 +286,27 @@ onMounted(() => fetchUsers(1));
 }
 
 .modal-card {
-  width: min(92vw, 420px);
+  width: min(92vw, 460px);
 }
 
 .danger-card {
+  color: #ffb4c1;
+  border-color: rgba(255, 80, 120, 0.35);
   margin-bottom: 14px;
+}
+
+.success-card {
+  color: #b9ffdd;
+  border-color: rgba(80, 255, 174, 0.35);
+  margin-bottom: 14px;
+}
+
+.mini-tip {
+  font-size: 13px;
+}
+
+.wrap-actions {
+  flex-wrap: wrap;
 }
 
 button:disabled {
