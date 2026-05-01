@@ -28,7 +28,22 @@ PREPARE stmt FROM @alter_products_category_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
-CREATE INDEX idx_products_category ON products(category);
+SET @has_products_category_idx := (
+  SELECT COUNT(*)
+  FROM INFORMATION_SCHEMA.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'products'
+    AND INDEX_NAME = 'idx_products_category'
+);
+
+SET @create_products_category_idx_sql := IF(
+  @has_products_category_idx = 0,
+  'CREATE INDEX idx_products_category ON products(category)',
+  'SELECT 1'
+);
+PREPARE stmt FROM @create_products_category_idx_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 INSERT INTO product_categories (value, label, sort_order, status) VALUES
 ('general', '综合商品', 100, 'enabled'),
